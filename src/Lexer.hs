@@ -1,8 +1,13 @@
 module Lexer
   ( identifier
+  , integer
   , reserved
   , symbol
   , whiteSpace
+  , parens
+  , braces
+  , semicolon
+  , commaSep
   )
   where
 
@@ -21,6 +26,10 @@ identifier :: Parser String
 identifier = T.identifier monkey
 
 
+integer :: Parser Integer
+integer = T.lexeme monkey (read <$> P.many1 P.digit)
+
+
 reserved :: String -> Parser ()
 reserved = T.reserved monkey
 
@@ -31,6 +40,22 @@ symbol = T.symbol monkey
 
 whiteSpace :: Parser ()
 whiteSpace = T.whiteSpace monkey
+
+
+parens :: Parser a -> Parser a
+parens = T.parens monkey
+
+
+braces :: Parser a -> Parser a
+braces = T.braces monkey
+
+
+semicolon :: Parser String
+semicolon = T.semi monkey
+
+
+commaSep :: Parser a -> Parser [a]
+commaSep = T.commaSep monkey
 
 
 monkey :: TokenParser ()
