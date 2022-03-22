@@ -12,6 +12,7 @@ library
     parsec
 
   exposed-modules:
+    Interpreter,
     Lexer,
     Parser
 
