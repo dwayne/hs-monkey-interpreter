@@ -7,6 +7,7 @@ import Text.Parsec (ParseError)
 
 data Value
   = VNum Integer
+  | VBool Bool
   | VNull
   deriving (Show)
 
@@ -54,6 +55,9 @@ runExpr expr =
   case expr of
     Num n ->
       Right $ VNum n
+
+    Bool b ->
+      Right $ VBool b
 
     _ ->
       Right VNull
