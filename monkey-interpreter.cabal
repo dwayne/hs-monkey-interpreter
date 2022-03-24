@@ -30,5 +30,6 @@ test-suite monkey-interpreter-tests
     parsec
 
   other-modules:
+    Test.InterpreterSpec
     Test.LexerSpec
     Test.ParserSpec

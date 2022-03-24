@@ -1,4 +1,8 @@
-module Interpreter where
+module Interpreter
+  ( Value(..), Error(..), ParseError
+  , run
+  )
+  where
 
 
 import Parser
@@ -9,12 +13,13 @@ data Value
   = VNum Integer
   | VBool Bool
   | VNull
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 data Error
   = SyntaxError ParseError
-  deriving (Show)
+  | ExpectedNum Value
+  deriving (Eq, Show)
 
 
 run :: String -> Either Error Value
@@ -59,5 +64,22 @@ runExpr expr =
     Bool b ->
       Right $ VBool b
 
+    Not a ->
+      performNot =<< runExpr a
+
+    Negate a ->
+      performNegate =<< runExpr a
+
     _ ->
       Right VNull
+
+
+performNot :: Value -> Either Error Value
+performNot (VBool b) = Right $ VBool $ not b
+performNot VNull = Right $ VBool True
+performNot _ = Right $ VBool False
+
+
+performNegate :: Value -> Either Error Value
+performNegate (VNum n) = Right $ VNum $ negate n
+performNegate v = Left $ ExpectedNum v
