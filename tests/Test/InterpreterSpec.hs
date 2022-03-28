@@ -93,6 +93,16 @@ prefixExpressionsSpec = do
         , ("(1 > 2) == false", VBool True)
         ]
 
+    describe "random examples" $ do -- page 124
+      makeGoodExamples
+        [ ("5 * 5 + 10", VNum 35)
+        , ("3 + 4 * 5 == 3 * 1 + 4 * 5", VBool True)
+        , ("5 * 10 > 40 + 5", VBool True)
+        , ("(10 + 2) * 30 == 300 + 20 * 3", VBool True)
+        , ("(5 > 5 == true) != false", VBool False)
+        , ("500 / 2 != 250", VBool False)
+        ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)
