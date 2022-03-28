@@ -157,9 +157,11 @@ performGreaterThan _ _ = Right $ VNull
 
 performEqual :: Value -> Value -> Either Error Value
 performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
+performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
 performEqual _ _ = Right $ VNull
 
 
 performNotEqual :: Value -> Value -> Either Error Value
 performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
+performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
 performNotEqual _ _ = Right $ VNull

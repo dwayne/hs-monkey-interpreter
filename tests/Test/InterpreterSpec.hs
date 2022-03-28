@@ -79,6 +79,20 @@ prefixExpressionsSpec = do
         , ("1 != 2", VBool True)
         ]
 
+    describe "boolean equality" $ do
+      makeGoodExamples
+        [ -- Examples from page 122-123
+          ("true == true", VBool True)
+        , ("false == false", VBool True)
+        , ("true == false", VBool False)
+        , ("true != false", VBool True)
+        , ("false != true", VBool True)
+        , ("(1 < 2) == true", VBool True)
+        , ("(1 < 2) == false", VBool False)
+        , ("(1 > 2) == true", VBool False)
+        , ("(1 > 2) == false", VBool True)
+        ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)
