@@ -90,6 +90,26 @@ runExpr expr =
       bVal <- runExpr b
       performDiv aVal bVal
 
+    LessThan a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performLessThan aVal bVal
+
+    GreaterThan a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performGreaterThan aVal bVal
+
+    Equal a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performEqual aVal bVal
+
+    NotEqual a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performNotEqual aVal bVal
+
     _ ->
       Right VNull
 
@@ -123,3 +143,23 @@ performMul _ _ = Right $ VNull
 performDiv :: Value -> Value -> Either Error Value
 performDiv (VNum a) (VNum b) = Right $ VNum $ a `div` b
 performDiv _ _ = Right $ VNull
+
+
+performLessThan :: Value -> Value -> Either Error Value
+performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
+performLessThan _ _ = Right $ VNull
+
+
+performGreaterThan :: Value -> Value -> Either Error Value
+performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
+performGreaterThan _ _ = Right $ VNull
+
+
+performEqual :: Value -> Value -> Either Error Value
+performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
+performEqual _ _ = Right $ VNull
+
+
+performNotEqual :: Value -> Value -> Either Error Value
+performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
+performNotEqual _ _ = Right $ VNull
