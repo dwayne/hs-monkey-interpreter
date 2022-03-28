@@ -70,6 +70,26 @@ runExpr expr =
     Negate a ->
       performNegate =<< runExpr a
 
+    Add a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performAdd aVal bVal
+
+    Sub a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performSub aVal bVal
+
+    Mul a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performMul aVal bVal
+
+    Div a b -> do
+      aVal <- runExpr a
+      bVal <- runExpr b
+      performDiv aVal bVal
+
     _ ->
       Right VNull
 
@@ -83,3 +103,23 @@ performNot _ = Right $ VBool False
 performNegate :: Value -> Either Error Value
 performNegate (VNum n) = Right $ VNum $ negate n
 performNegate v = Left $ ExpectedNum v
+
+
+performAdd :: Value -> Value -> Either Error Value
+performAdd (VNum a) (VNum b) = Right $ VNum $ a + b
+performAdd _ _ = Right $ VNull
+
+
+performSub :: Value -> Value -> Either Error Value
+performSub (VNum a) (VNum b) = Right $ VNum $ a - b
+performSub _ _ = Right $ VNull
+
+
+performMul :: Value -> Value -> Either Error Value
+performMul (VNum a) (VNum b) = Right $ VNum $ a * b
+performMul _ _ = Right $ VNull
+
+
+performDiv :: Value -> Value -> Either Error Value
+performDiv (VNum a) (VNum b) = Right $ VNum $ a `div` b
+performDiv _ _ = Right $ VNull
