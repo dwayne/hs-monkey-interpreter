@@ -43,7 +43,7 @@ runStmts (stmt : rest) = do
   val <- runStmt stmt
   case val of
     VReturn retVal ->
-      Right retVal
+      Right $ toNonReturnValue retVal
 
     _ ->
       case rest of
@@ -52,6 +52,24 @@ runStmts (stmt : rest) = do
 
         _ ->
           runStmts rest
+
+
+toNonReturnValue :: Value -> Value
+toNonReturnValue (VReturn val) = toNonReturnValue val
+toNonReturnValue val = val
+
+
+runBlock :: [Stmt] -> Either Error Value
+runBlock [] = Right VNull
+runBlock [stmt] = runStmt stmt
+runBlock (stmt : rest) = do
+  val <- runStmt stmt
+  case val of
+    VReturn retVal ->
+      Right val
+
+    _ ->
+      runBlock rest
 
 
 runStmt :: Stmt -> Either Error Value
@@ -125,14 +143,14 @@ runExpr expr =
     If condition thenBlock maybeElseBlock -> do
       conditionVal <- runExpr condition
       if isTruthy conditionVal
-        then runStmts thenBlock
+        then runBlock thenBlock
         else
           case maybeElseBlock of
             Nothing ->
               Right VNull
 
             Just elseBlock ->
-              runStmts elseBlock
+              runBlock elseBlock
 
     _ ->
       Right VNull
