@@ -34,29 +34,7 @@ run input =
 
 
 runProgram :: Program -> Either Error Value
-runProgram (Program stmts) = runStmts stmts
-
-
-runStmts :: [Stmt] -> Either Error Value
-runStmts [] = Right VNull
-runStmts (stmt : rest) = do
-  val <- runStmt stmt
-  case val of
-    VReturn retVal ->
-      Right $ toNonReturnValue retVal
-
-    _ ->
-      case rest of
-        [] ->
-          Right val
-
-        _ ->
-          runStmts rest
-
-
-toNonReturnValue :: Value -> Value
-toNonReturnValue (VReturn val) = toNonReturnValue val
-toNonReturnValue val = val
+runProgram (Program stmts) = returned <$> runBlock stmts
 
 
 runBlock :: [Stmt] -> Either Error Value
@@ -64,12 +42,9 @@ runBlock [] = Right VNull
 runBlock [stmt] = runStmt stmt
 runBlock (stmt : rest) = do
   val <- runStmt stmt
-  case val of
-    VReturn retVal ->
-      Right val
-
-    _ ->
-      runBlock rest
+  if isReturned val
+    then Right val
+    else runBlock rest
 
 
 runStmt :: Stmt -> Either Error Value
@@ -79,7 +54,7 @@ runStmt stmt =
       Right VNull
 
     Return expr ->
-      runExpr expr >>= (Right . VReturn)
+      VReturn <$> runExpr expr
 
     ExprStmt expr ->
       runExpr expr
@@ -213,3 +188,13 @@ isTruthy :: Value -> Bool
 isTruthy VNull = False
 isTruthy (VBool False) = False
 isTruthy _ = True
+
+
+isReturned :: Value -> Bool
+isReturned (VReturn _) = True
+isReturned _ = False
+
+
+returned :: Value -> Value
+returned (VReturn val) = returned val
+returned val = val
