@@ -13,6 +13,7 @@ data Value
   = VNum Integer
   | VBool Bool
   | VNull
+  | VReturn Value
   deriving (Eq, Show)
 
 
@@ -38,8 +39,19 @@ runProgram (Program stmts) = runStmts stmts
 
 runStmts :: [Stmt] -> Either Error Value
 runStmts [] = Right VNull
-runStmts [stmt] = runStmt stmt
-runStmts (stmt : rest) = runStmt stmt >> runStmts rest
+runStmts (stmt : rest) = do
+  val <- runStmt stmt
+  case val of
+    VReturn retVal ->
+      Right retVal
+
+    _ ->
+      case rest of
+        [] ->
+          Right val
+
+        _ ->
+          runStmts rest
 
 
 runStmt :: Stmt -> Either Error Value
@@ -48,8 +60,8 @@ runStmt stmt =
     Let _ _ ->
       Right VNull
 
-    Return _ ->
-      Right VNull
+    Return expr ->
+      runExpr expr >>= (Right . VReturn)
 
     ExprStmt expr ->
       runExpr expr

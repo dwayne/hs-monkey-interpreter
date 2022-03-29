@@ -114,6 +114,14 @@ prefixExpressionsSpec = do
       , ("if (1 < 2) { 10 } else { 20 }", VNum 10)
       ]
 
+  describe "return statements" $ do
+    makeGoodExamples
+      [ ("return 10;", VNum 10)
+      , ("return 10; 9", VNum 10)
+      , ("return 2 * 5; 9", VNum 10)
+      , ("9; return 2 * 5; 9", VNum 10)
+      ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)
