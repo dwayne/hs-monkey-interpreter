@@ -110,6 +110,18 @@ runExpr expr =
       bVal <- runExpr b
       performNotEqual aVal bVal
 
+    If condition thenBlock maybeElseBlock -> do
+      conditionVal <- runExpr condition
+      if isTruthy conditionVal
+        then runStmts thenBlock
+        else
+          case maybeElseBlock of
+            Nothing ->
+              Right VNull
+
+            Just elseBlock ->
+              runStmts elseBlock
+
     _ ->
       Right VNull
 
@@ -165,3 +177,9 @@ performNotEqual :: Value -> Value -> Either Error Value
 performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
 performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
 performNotEqual _ _ = Right $ VNull
+
+
+isTruthy :: Value -> Bool
+isTruthy VNull = False
+isTruthy (VBool False) = False
+isTruthy _ = True
