@@ -184,6 +184,40 @@ prefixExpressionsSpec = do
       , ("5 != true", VBool True)
       ]
 
+  describe "let statements" $ do
+    makeGoodExamples
+      [ ("let a = 5; a;", VNum 5)
+      , ("let a = 5 * 5; a;", VNum 25)
+      , ("let a = 5; let b = a; b;", VNum 5)
+      , ("let a = 5; let b = a; let c = a + b + 5; c;", VNum 15)
+
+      -- more examples from page 140
+      , ( "let a = 5;                \
+          \let b = a > 3;            \
+          \let c = a * 99;           \
+          \if (b) { 10 } else { 1 }; "
+        , VNum 10
+        )
+      , ( "let a = 5;                              \
+          \let b = a > 3;                          \
+          \let c = a * 99;                         \
+          \let d = if (c > a) { 99 } else { 100 }; \
+          \d                                       "
+        , VNum 99
+        )
+      , ( "let a = 5;                              \
+          \let b = a > 3;                          \
+          \let c = a * 99;                         \
+          \let d = if (c > a) { 99 } else { 100 }; \
+          \d * c * a;                              "
+        , VNum 245025
+        )
+      ]
+
+    makeBadExamples
+      [ ("foobar", IdentifierNotFound "foobar")
+      ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)
