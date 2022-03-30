@@ -19,7 +19,8 @@ data Value
 
 data Error
   = SyntaxError ParseError
-  | ExpectedNum Value
+  | TypeMismatch String
+  | UnknownOperator String
   deriving (Eq, Show)
 
 
@@ -139,49 +140,79 @@ performNot _ = Right $ VBool False
 
 performNegate :: Value -> Either Error Value
 performNegate (VNum n) = Right $ VNum $ negate n
-performNegate v = Left $ ExpectedNum v
+performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
 
 
 performAdd :: Value -> Value -> Either Error Value
 performAdd (VNum a) (VNum b) = Right $ VNum $ a + b
-performAdd _ _ = Right $ VNull
+performAdd aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " + " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " + " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performSub :: Value -> Value -> Either Error Value
 performSub (VNum a) (VNum b) = Right $ VNum $ a - b
-performSub _ _ = Right $ VNull
+performSub aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " - " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " - " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performMul :: Value -> Value -> Either Error Value
 performMul (VNum a) (VNum b) = Right $ VNum $ a * b
-performMul _ _ = Right $ VNull
+performMul aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " * " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " * " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performDiv :: Value -> Value -> Either Error Value
 performDiv (VNum a) (VNum b) = Right $ VNum $ a `div` b
-performDiv _ _ = Right $ VNull
+performDiv aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " / " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " / " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performLessThan :: Value -> Value -> Either Error Value
 performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
-performLessThan _ _ = Right $ VNull
+performLessThan aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " < " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " < " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performGreaterThan :: Value -> Value -> Either Error Value
 performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
-performGreaterThan _ _ = Right $ VNull
+performGreaterThan aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " > " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " > " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performEqual :: Value -> Value -> Either Error Value
 performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
 performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
-performEqual _ _ = Right $ VNull
+performEqual _ _ = Right $ VBool False
 
 
 performNotEqual :: Value -> Value -> Either Error Value
 performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
 performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
-performNotEqual _ _ = Right $ VNull
+performNotEqual _ _ = Right $ VBool True
 
 
 isTruthy :: Value -> Bool
@@ -198,3 +229,10 @@ isReturned _ = False
 returned :: Value -> Value
 returned (VReturn val) = returned val
 returned val = val
+
+
+typeOf :: Value -> String
+typeOf (VNum _) = "INTEGER"
+typeOf (VBool _) = "BOOLEAN"
+typeOf VNull = "NULL"
+typeOf (VReturn _) = "RETURN_VALUE"

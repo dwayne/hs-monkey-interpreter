@@ -38,7 +38,7 @@ prefixExpressionsSpec = do
         ]
 
       makeBadExamples
-        [ ("-true", ExpectedNum $ VBool True)
+        [ ("-true", UnknownOperator "-BOOLEAN")
         ]
 
   describe "infix expressions" $ do
@@ -135,6 +135,53 @@ prefixExpressionsSpec = do
       , ("return if (true) { return 10; };", VNum 10)
       , ("return if (true) { return if (true) { return 10; }; };", VNum 10)
       , ("return if (true) { return if (false) { return 10; }; };", VNull)
+      ]
+
+  describe "error handling" $ do
+    makeBadExamples
+      [ ("5 + true;", TypeMismatch "INTEGER + BOOLEAN")
+      , ("5 + true; 5;", TypeMismatch "INTEGER + BOOLEAN")
+      , ("-true", UnknownOperator "-BOOLEAN")
+      , ("true + false;", UnknownOperator "BOOLEAN + BOOLEAN")
+      , ("5; true + false; 5", UnknownOperator "BOOLEAN + BOOLEAN")
+      , ("if (10 > 1) { true + false; }", UnknownOperator "BOOLEAN + BOOLEAN")
+      , ( "if (10 > 1) {   \
+          \  if (10 > 1) { \
+          \    return true + false;  \
+          \  }             \
+          \                \
+          \  return 1;     \
+          \}               "
+        , UnknownOperator "BOOLEAN + BOOLEAN"
+        )
+
+      , ("true + 5;", TypeMismatch "BOOLEAN + INTEGER")
+
+      -- extra tests to ensure I implemented it correctly
+      , ("5 - true;", TypeMismatch "INTEGER - BOOLEAN")
+      , ("true - 5;", TypeMismatch "BOOLEAN - INTEGER")
+      , ("true - false;", UnknownOperator "BOOLEAN - BOOLEAN")
+      , ("5 * true;", TypeMismatch "INTEGER * BOOLEAN")
+      , ("true * 5;", TypeMismatch "BOOLEAN * INTEGER")
+      , ("true * false;", UnknownOperator "BOOLEAN * BOOLEAN")
+      , ("5 / true;", TypeMismatch "INTEGER / BOOLEAN")
+      , ("true / 5;", TypeMismatch "BOOLEAN / INTEGER")
+      , ("true / false;", UnknownOperator "BOOLEAN / BOOLEAN")
+
+      , ("5 < true;", TypeMismatch "INTEGER < BOOLEAN")
+      , ("true < 5;", TypeMismatch "BOOLEAN < INTEGER")
+      , ("true < false;", UnknownOperator "BOOLEAN < BOOLEAN")
+      , ("5 > true;", TypeMismatch "INTEGER > BOOLEAN")
+      , ("true > 5;", TypeMismatch "BOOLEAN > INTEGER")
+      , ("true > false;", UnknownOperator "BOOLEAN > BOOLEAN")
+      ]
+
+  describe "mismatched types equality" $ do
+    makeGoodExamples
+      [ ("true == 5", VBool False)
+      , ("5 == true", VBool False)
+      , ("true != 5", VBool True)
+      , ("5 != true", VBool True)
       ]
 
 
