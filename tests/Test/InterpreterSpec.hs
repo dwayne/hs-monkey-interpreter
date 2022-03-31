@@ -225,6 +225,38 @@ prefixExpressionsSpec = do
       -- just a sanity check
       show val `shouldBe` "<function>"
 
+  describe "functions calls" $ do
+    makeGoodExamples
+      [ ("let identity = fn(x) { x; }; identity(5);", VNum 5)
+      , ("let double = fn(x) { x * 2; }; double(5);", VNum 10)
+      , ("let add = fn(x, y) { x + y; }; add(5, 5);", VNum 10)
+      , ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", VNum 20)
+      , ("fn(x) { x; }(5)", VNum 5)
+
+      -- Why extend the function’s environment and not the current environment?
+      -- page 148
+      , ("let newAdder = fn(x) {     \
+         \  fn(y) { x + y };         \
+         \ };                        \
+         \ let addTwo = newAdder(2); \
+         \ addTwo(2);                "
+        , VNum 4
+        )
+
+      , ( "let add = fn(a, b) { a + b };                  \
+          \let sub = fn(a, b) { a - b };                  \
+          \let applyFunc = fn(a, b, func) { func(a, b) }; \
+          \applyFunc(2, 2, add);                          "
+        , VNum 4
+        )
+      , ( "let add = fn(a, b) { a + b };                  \
+          \let sub = fn(a, b) { a - b };                  \
+          \let applyFunc = fn(a, b, func) { func(a, b) }; \
+          \applyFunc(10, 2, sub);                          "
+        , VNum 8
+        )
+      ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)

@@ -47,6 +47,7 @@ data Error
   | TypeMismatch String
   | UnknownOperator String
   | IdentifierNotFound String
+  | NotAFunction String
   deriving (Eq, Show)
 
 
@@ -65,7 +66,7 @@ runProgram (Program stmts) =
   snd $ fmap (fmap returned) $ runBlock stmts Env.empty
 
 
-runBlock :: [Stmt] -> Env -> (Env, Either Error Value)
+runBlock :: Block -> Env -> (Env, Either Error Value)
 runBlock [] env = (env, Right VNull)
 runBlock [stmt] env = runStmt stmt env
 runBlock (stmt : rest) env =
@@ -282,8 +283,38 @@ runExpr expr env =
     Function params body ->
       (env, Right $ VFunction params body env)
 
-    _ ->
-      (env, Right VNull)
+    Call fExpr argExprs ->
+      let
+        eitherFVal =
+          snd $ runExpr fExpr env
+
+        eitherArgVals =
+          runExprs argExprs env
+      in
+      case eitherFVal of
+        Right fVal ->
+          case eitherArgVals of
+            Right argVals ->
+              (env, callFunction fVal argVals)
+
+            Left err ->
+              (env, Left err)
+
+        Left err ->
+          (env, Left err)
+
+
+runExprs :: [Expr] -> Env -> Either Error [Value]
+runExprs exprs env = helper exprs []
+  where
+    helper [] vals = Right $ reverse vals
+    helper (expr:rest) vals =
+      case snd (runExpr expr env) of
+        Right val ->
+          helper rest (val : vals)
+
+        Left err ->
+          Left err
 
 
 performNot :: Value -> Either Error Value
@@ -367,6 +398,22 @@ performNotEqual :: Value -> Value -> Either Error Value
 performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
 performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
 performNotEqual _ _ = Right $ VBool True
+
+
+callFunction :: Value -> [Value] -> Either Error Value
+callFunction (VFunction params body env) args =
+  let
+    extendedEnv =
+      Env.extend (zip params args) env
+  in
+  case snd (runBlock body extendedEnv) of
+    Right val ->
+      Right $ returned val
+
+    err ->
+      err
+
+callFunction val _ = Left $ NotAFunction $ typeOf val
 
 
 isTruthy :: Value -> Bool
