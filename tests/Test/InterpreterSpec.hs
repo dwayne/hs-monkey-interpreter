@@ -218,6 +218,13 @@ prefixExpressionsSpec = do
       [ ("foobar", IdentifierNotFound "foobar")
       ]
 
+  describe "function definitions" $ do
+    it "example 1" $ do
+      let Right val = run "fn(x) { x + 2; };"
+
+      -- just a sanity check
+      show val `shouldBe` "<function>"
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)

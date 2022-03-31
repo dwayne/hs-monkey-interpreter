@@ -17,7 +17,29 @@ data Value
   | VBool Bool
   | VNull
   | VReturn Value
-  deriving (Eq, Show)
+  | VFunction [Id] Block Env
+
+
+type Env = Environment Id Value
+
+
+instance Eq Value where
+  VNum a == VNum b = a == b
+  VBool a == VBool b = a == b
+  VNull == VNull = True
+
+  VReturn aVal == bVal = aVal == bVal
+  aVal == VReturn bVal = aVal == bVal
+
+  _ == _ = False
+
+
+instance Show Value where
+  show (VNum n) = show n
+  show (VBool b) = show b
+  show VNull = "null"
+  show (VReturn val) = show val
+  show (VFunction _ _ _) = "<function>"
 
 
 data Error
@@ -26,9 +48,6 @@ data Error
   | UnknownOperator String
   | IdentifierNotFound String
   deriving (Eq, Show)
-
-
-type Env = Environment Id Value
 
 
 run :: String -> Either Error Value
@@ -257,6 +276,12 @@ runExpr expr env =
               Just elseBlock ->
                 runBlock elseBlock env'
 
+        Left err ->
+          (env', Left err)
+
+    Function params body ->
+      (env, Right $ VFunction params body env)
+
     _ ->
       (env, Right VNull)
 
@@ -365,3 +390,4 @@ typeOf (VNum _) = "INTEGER"
 typeOf (VBool _) = "BOOLEAN"
 typeOf VNull = "NULL"
 typeOf (VReturn _) = "RETURN_VALUE"
+typeOf (VFunction _ _ _) = "FUNCTION"
