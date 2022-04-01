@@ -1,6 +1,9 @@
 module Test.InterpreterSpec (spec) where
 
 
+import qualified Environment as Env
+
+
 import Data.Bifunctor (second)
 import Interpreter (run, Value(..), Error(..))
 import Test.Hspec
@@ -220,7 +223,7 @@ prefixExpressionsSpec = do
 
   describe "function definitions" $ do
     it "example 1" $ do
-      let Right val = run "fn(x) { x + 2; };"
+      let Right val = snd $ run "fn(x) { x + 2; };" Env.empty
 
       -- just a sanity check
       show val `shouldBe` "<function>"
@@ -273,7 +276,7 @@ makeExamples examples =
 
     makeExample (n, (input, expectedOutput)) =
       it ("example " ++ show n) $
-        run input `shouldBe` expectedOutput
+        snd (run input Env.empty) `shouldBe` expectedOutput
 
     specs = map makeExample numberedExamples
   in

@@ -1,5 +1,5 @@
 module Interpreter
-  ( Value(..), Error(..), ParseError
+  ( Value(..), Env, Error(..), ParseError
   , run
   )
   where
@@ -36,9 +36,14 @@ instance Eq Value where
 
 instance Show Value where
   show (VNum n) = show n
-  show (VBool b) = show b
+
+  show (VBool True) = "true"
+  show (VBool False) = "false"
+
   show VNull = "null"
+
   show (VReturn val) = show val
+
   show (VFunction _ _ _) = "<function>"
 
 
@@ -51,19 +56,19 @@ data Error
   deriving (Eq, Show)
 
 
-run :: String -> Either Error Value
-run input =
+run :: String -> Env -> (Env, Either Error Value)
+run input env =
   case parse input of
     Right program ->
-      runProgram program
+      runProgram program env
 
     Left parseError ->
-      Left $ SyntaxError parseError
+      (env, Left $ SyntaxError parseError)
 
 
-runProgram :: Program -> Either Error Value
-runProgram (Program stmts) =
-  snd $ fmap (fmap returned) $ runBlock stmts Env.empty
+runProgram :: Program -> Env -> (Env, Either Error Value)
+runProgram (Program stmts) env =
+  fmap (fmap returned) $ runBlock stmts env
 
 
 runBlock :: Block -> Env -> (Env, Either Error Value)
