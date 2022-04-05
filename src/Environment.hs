@@ -9,7 +9,7 @@ module Environment
 
 import qualified Data.Map as Map
 
-import Data.IORef (IORef, newIORef, readIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 
 data Environment k v
@@ -47,11 +47,11 @@ get k (Environment s) = helper s
           return success
 
 
-set :: Ord k => k -> v -> Environment k v -> IO (Environment k v)
+set :: Ord k => k -> v -> Environment k v -> IO ()
 set k v (Environment stackRef) = do
   stack <- readIORef stackRef
   let m = _sTop stack
-  Environment <$> newIORef (stack { _sTop = Map.insert k v m })
+  writeIORef stackRef (stack { _sTop = Map.insert k v m })
 
 
 extend :: Ord k => [(k, v)] -> Environment k v -> IO (Environment k v)

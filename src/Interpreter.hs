@@ -97,8 +97,8 @@ runStmt stmt env =
 
       case eitherVal of
         Right val -> do
-          env'' <- Env.set identifier val env'
-          return (env'', Right VNull)
+          Env.set identifier val env'
+          return (env', Right VNull)
 
         Left err ->
           return (env, Left err)
