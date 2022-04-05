@@ -19,7 +19,7 @@ data Environment k v
 data Stack k v
   = Stack
       { _sTop :: Map.Map k v
-      , _sNext :: Maybe (IORef (Stack k v))
+      , _sNext :: Maybe (Stack k v)
       }
 
 
@@ -30,35 +30,26 @@ empty = Environment <$> newIORef stack
 
 
 get :: Ord k => k -> Environment k v -> IO (Maybe v)
-get k (Environment s) = helper s
+get k (Environment stackRef) = helper <$> readIORef stackRef
   where
-    helper stackRef = do
-      stack <- readIORef stackRef
+    helper stack = do
       case Map.lookup k (_sTop stack) of
         Nothing ->
-          case _sNext stack of
-            Nothing ->
-              return Nothing
-
-            Just nextStackRef ->
-              helper nextStackRef
+          helper =<< _sNext stack
 
         success ->
-          return success
+          success
 
 
 set :: Ord k => k -> v -> Environment k v -> IO ()
 set k v (Environment stackRef) = do
   stack <- readIORef stackRef
   let m = _sTop stack
-  writeIORef stackRef (stack { _sTop = Map.insert k v m })
+  writeIORef stackRef $ stack { _sTop = Map.insert k v m }
 
 
 extend :: Ord k => [(k, v)] -> Environment k v -> IO (Environment k v)
-extend bindings (Environment stackRef) =
-  Environment <$> newIORef (
-    Stack
-      { _sTop = Map.fromList bindings
-      , _sNext = Just stackRef
-      }
-  )
+extend bindings (Environment stackRef) = do
+  stack <- readIORef stackRef
+  let newStack = Stack { _sTop = Map.fromList bindings, _sNext = Just stack }
+  Environment <$> newIORef newStack
