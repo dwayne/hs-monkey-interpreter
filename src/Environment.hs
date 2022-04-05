@@ -13,43 +13,33 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
 
 data Environment k v
-  = Environment (IORef (Stack k v))
-
-
-data Stack k v
-  = Stack
-      { _sTop :: Map.Map k v
-      , _sNext :: Maybe (Stack k v)
-      }
+  = Environment (IORef [Map.Map k v])
 
 
 empty :: IO (Environment k v)
-empty = Environment <$> newIORef stack
-  where
-    stack = Stack { _sTop = Map.empty, _sNext = Nothing }
+empty = Environment <$> newIORef [Map.empty]
 
 
 get :: Ord k => k -> Environment k v -> IO (Maybe v)
-get k (Environment stackRef) = helper <$> readIORef stackRef
+get k (Environment mapsRef) = helper <$> readIORef mapsRef
   where
-    helper stack = do
-      case Map.lookup k (_sTop stack) of
+    helper [] = Nothing
+    helper (m:ms) =
+      case Map.lookup k m of
         Nothing ->
-          helper =<< _sNext stack
+          helper ms
 
         success ->
           success
 
 
 set :: Ord k => k -> v -> Environment k v -> IO ()
-set k v (Environment stackRef) = do
-  stack <- readIORef stackRef
-  let m = _sTop stack
-  writeIORef stackRef $ stack { _sTop = Map.insert k v m }
+set k v (Environment mapsRef) = do
+  (m:ms) <- readIORef mapsRef
+  writeIORef mapsRef $ Map.insert k v m : ms
 
 
 extend :: Ord k => [(k, v)] -> Environment k v -> IO (Environment k v)
-extend bindings (Environment stackRef) = do
-  stack <- readIORef stackRef
-  let newStack = Stack { _sTop = Map.fromList bindings, _sNext = Just stack }
-  Environment <$> newIORef newStack
+extend bindings (Environment mapsRef) = do
+  maps <- readIORef mapsRef
+  Environment <$> newIORef (Map.fromList bindings : maps)
