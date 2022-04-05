@@ -223,10 +223,10 @@ prefixExpressionsSpec = do
 
   describe "function definitions" $ do
     it "example 1" $ do
-      let ioEitherVal = snd <$> (run "fn(x) { x + 2; };" =<< Env.empty)
+      Right val <- snd <$> (run "fn(x) { x + 2; };" =<< Env.empty)
 
       -- just a sanity check
-      (show <$> ioEitherVal) `shouldReturn` "Right <function>"
+      show val `shouldBe` "<function>"
 
   describe "functions calls" $ do
     makeGoodExamples
