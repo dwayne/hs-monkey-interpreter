@@ -260,6 +260,14 @@ prefixExpressionsSpec = do
         )
       ]
 
+  describe "recursion" $ do
+    makeGoodExamples
+      [ ( "let factorial = fn(n) { if (n == 0) { 1 } else { n * factorial(n - 1) } }; \
+          \factorial(5)                                                               "
+        , VNum 120
+        )
+      ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)
