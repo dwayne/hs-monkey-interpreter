@@ -7,6 +7,7 @@ module Interpreter
 
 import qualified Environment as Env
 
+import Control.Monad (join, liftM2)
 import Environment (Environment)
 import Parser
 import Text.Parsec (ParseError)
@@ -56,220 +57,151 @@ data Error
   deriving (Eq, Show)
 
 
-run :: String -> Env -> (Env, Either Error Value)
+run :: String -> Env -> IO (Env, Either Error Value)
 run input env =
   case parse input of
     Right program ->
       runProgram program env
 
     Left parseError ->
-      (env, Left $ SyntaxError parseError)
+      return (env, Left $ SyntaxError parseError)
 
 
-runProgram :: Program -> Env -> (Env, Either Error Value)
+runProgram :: Program -> Env -> IO (Env, Either Error Value)
 runProgram (Program stmts) env =
-  fmap (fmap returned) $ runBlock stmts env
+  fmap (fmap (fmap returned)) $ runBlock stmts env
 
 
-runBlock :: Block -> Env -> (Env, Either Error Value)
-runBlock [] env = (env, Right VNull)
+runBlock :: Block -> Env -> IO (Env, Either Error Value)
+runBlock [] env = return (env, Right VNull)
 runBlock [stmt] env = runStmt stmt env
-runBlock (stmt : rest) env =
-  let
-    (env', eitherVal) =
-      runStmt stmt env
-  in
+runBlock (stmt : rest) env = do
+  (env', eitherVal) <- runStmt stmt env
+
   case eitherVal of
     Right val ->
       if isReturned val then
-        (env', Right val)
+        return (env', Right val)
       else
         runBlock rest env'
 
     Left err ->
-      (env', Left err)
+      return (env', Left err)
 
 
-runStmt :: Stmt -> Env -> (Env, Either Error Value)
+runStmt :: Stmt -> Env -> IO (Env, Either Error Value)
 runStmt stmt env =
   case stmt of
-    Let identifier expr ->
-      let
-        (env', eitherVal) =
-          runExpr expr env
-      in
+    Let identifier expr -> do
+      (env', eitherVal) <- runExpr expr env
+
       case eitherVal of
-        Right val ->
-          (Env.set identifier val env', Right VNull)
+        Right val -> do
+          env'' <- Env.set identifier val env'
+          return (env'', Right VNull)
 
         Left err ->
-          (env, Left err)
+          return (env, Left err)
 
     Return expr ->
-      fmap (fmap VReturn) $ runExpr expr env
+      fmap (fmap (fmap VReturn)) $ runExpr expr env
 
     ExprStmt expr ->
       runExpr expr env
 
 
-runExpr :: Expr -> Env -> (Env, Either Error Value)
+runExpr :: Expr -> Env -> IO (Env, Either Error Value)
 runExpr expr env =
   case expr of
-    Var identifier ->
-      ( env
-      , case Env.get identifier env of
-          Just val ->
-            Right val
+    Var identifier -> do
+      maybeVal <- Env.get identifier env
+      case maybeVal of
+        Just val ->
+          return (env, Right val)
 
-          Nothing ->
-            Left $ IdentifierNotFound identifier
-      )
+        Nothing ->
+          return (env, Left $ IdentifierNotFound identifier)
 
     Num n ->
-      (env, Right $ VNum n)
+      return (env, Right $ VNum n)
 
     Bool b ->
-      (env, Right $ VBool b)
+      return (env, Right $ VBool b)
 
-    Not a ->
-      let
-        (env', eitherVal) =
-          runExpr a env
-      in
-      (env', eitherVal >>= performNot)
+    Not a -> do
+      (env', eitherVal) <- runExpr a env
+      return (env', eitherVal >>= performNot)
 
-    Negate a ->
-      let
-        (env', eitherVal) =
-          runExpr a env
-      in
-      (env', eitherVal >>= performNegate)
+    Negate a -> do
+      (env', eitherVal) <- runExpr a env
+      return (env', eitherVal >>= performNegate)
 
-    Add a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    Add a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performAdd eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performAdd aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    Sub a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    Sub a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performSub eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performSub aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    Mul a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    Mul a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performMul eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performMul aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    Div a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    Div a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performDiv eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performDiv aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    LessThan a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    LessThan a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performLessThan eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performLessThan aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    GreaterThan a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    GreaterThan a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performGreaterThan eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performGreaterThan aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    Equal a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    Equal a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performEqual eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performEqual aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    NotEqual a b ->
-      let
-        (env', eitherAVal) =
-          runExpr a env
+    NotEqual a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
 
-        (env'', eitherBVal) =
-          runExpr b env'
+      let result = join $ liftM2 performNotEqual eitherAVal eitherBVal
 
-        result = do
-          aVal <- eitherAVal
-          bVal <- eitherBVal
-          performNotEqual aVal bVal
-      in
-      (env'', result)
+      return (env'', result)
 
-    If condition thenBlock maybeElseBlock ->
-      let
-        (env', eitherConditionVal) =
-          runExpr condition env
-      in
+    If condition thenBlock maybeElseBlock -> do
+      (env', eitherConditionVal) <- runExpr condition env
       case eitherConditionVal of
         Right conditionVal ->
           if isTruthy conditionVal then
@@ -277,49 +209,47 @@ runExpr expr env =
           else
             case maybeElseBlock of
               Nothing ->
-                (env', Right VNull)
+                return (env', Right VNull)
 
               Just elseBlock ->
                 runBlock elseBlock env'
 
         Left err ->
-          (env', Left err)
+          return (env', Left err)
 
     Function params body ->
-      (env, Right $ VFunction params body env)
+      return (env, Right $ VFunction params body env)
 
-    Call fExpr argExprs ->
-      let
-        eitherFVal =
-          snd $ runExpr fExpr env
+    Call fExpr argExprs -> do
+      (_, eitherFVal) <- runExpr fExpr env
+      eitherArgVals <- runExprs argExprs env
 
-        eitherArgVals =
-          runExprs argExprs env
-      in
       case eitherFVal of
         Right fVal ->
           case eitherArgVals of
-            Right argVals ->
-              (env, callFunction fVal argVals)
+            Right argVals -> do
+              eitherVal <- callFunction fVal argVals
+              return (env, eitherVal)
 
             Left err ->
-              (env, Left err)
+              return (env, Left err)
 
         Left err ->
-          (env, Left err)
+          return (env, Left err)
 
 
-runExprs :: [Expr] -> Env -> Either Error [Value]
+runExprs :: [Expr] -> Env -> IO (Either Error [Value])
 runExprs exprs env = helper exprs []
   where
-    helper [] vals = Right $ reverse vals
-    helper (expr:rest) vals =
-      case snd (runExpr expr env) of
+    helper [] vals = return $ Right $ reverse vals
+    helper (expr:rest) vals = do
+      (_, eitherVal) <- runExpr expr env
+      case eitherVal of
         Right val ->
           helper rest (val : vals)
 
         Left err ->
-          Left err
+          return $ Left err
 
 
 performNot :: Value -> Either Error Value
@@ -405,20 +335,18 @@ performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
 performNotEqual _ _ = Right $ VBool True
 
 
-callFunction :: Value -> [Value] -> Either Error Value
-callFunction (VFunction params body env) args =
-  let
-    extendedEnv =
-      Env.extend (zip params args) env
-  in
-  case snd (runBlock body extendedEnv) of
+callFunction :: Value -> [Value] -> IO (Either Error Value)
+callFunction (VFunction params body env) args = do
+  extendedEnv <- Env.extend (zip params args) env
+  (_, eitherVal) <- runBlock body extendedEnv
+  case eitherVal of
     Right val ->
-      Right $ returned val
+      return $ Right $ returned val
 
     err ->
-      err
+      return err
 
-callFunction val _ = Left $ NotAFunction $ typeOf val
+callFunction val _ = return $ Left $ NotAFunction $ typeOf val
 
 
 isTruthy :: Value -> Bool

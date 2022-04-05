@@ -27,7 +27,7 @@ getUsername =
 
 
 start :: IO ()
-start = void $ loop Env.empty
+start = void $ loop <$> Env.empty
 
 
 loop :: I.Env -> IO ()
@@ -36,15 +36,16 @@ loop env = do
   hFlush stdout
 
   line <- getLine
-  case I.run line env of
-    (env', Right I.VNull) ->
+  (env', eitherVal) <- I.run line env
+  case eitherVal of
+    Right I.VNull ->
       loop env'
 
-    (env', Right val) -> do
+    Right val -> do
       print val
       loop env'
 
-    (_, Left err) -> do
+    Left err -> do
       -- TODO: Display an appropriate error message.
       print err
       loop env
