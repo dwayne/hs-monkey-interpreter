@@ -15,6 +15,7 @@ spec :: Spec
 spec = do
   identifierSpec
   integerSpec
+  stringSpec
 
 
 identifierSpec :: Spec
@@ -41,6 +42,19 @@ integerSpec =
 
     it "example 3" $ do
       parse Lexer.integer "123" `shouldBe` Right 123
+
+
+stringSpec :: Spec
+stringSpec =
+  describe "string" $ do
+    it "example 1" $ do
+      parse Lexer.string "\"\"" `shouldBe` Right ""
+
+    it "example 2" $ do
+      parse Lexer.string "\"foobar\"" `shouldBe` Right "foobar"
+
+    it "example 3" $ do
+      parse Lexer.string "\"foo bar\"" `shouldBe` Right "foo bar"
 
 
 parse :: Parser a -> String -> Either ParseError a

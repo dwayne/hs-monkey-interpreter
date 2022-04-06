@@ -16,6 +16,7 @@ import Text.Parsec (ParseError)
 data Value
   = VNum Integer
   | VBool Bool
+  | VString String
   | VNull
   | VReturn Value
   | VFunction [Id] Block Env
@@ -27,6 +28,7 @@ type Env = Environment Id Value
 instance Eq Value where
   VNum a == VNum b = a == b
   VBool a == VBool b = a == b
+  VString a == VString b = a == b
   VNull == VNull = True
 
   VReturn aVal == bVal = aVal == bVal
@@ -40,6 +42,8 @@ instance Show Value where
 
   show (VBool True) = "true"
   show (VBool False) = "false"
+
+  show (VString s) = s
 
   show VNull = "null"
 
@@ -127,6 +131,9 @@ runExpr expr env =
 
     Bool b ->
       return (env, Right $ VBool b)
+
+    String s ->
+      return (env, Right $ VString s)
 
     Not a -> do
       (env', eitherVal) <- runExpr a env
@@ -265,6 +272,7 @@ performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
 
 performAdd :: Value -> Value -> Either Error Value
 performAdd (VNum a) (VNum b) = Right $ VNum $ a + b
+performAdd (VString a) (VString b) = Right $ VString $ a ++ b
 performAdd aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " + " ++ tb
   | otherwise = Left $ UnknownOperator $ ta ++ " + " ++ tb
@@ -368,6 +376,7 @@ returned val = val
 typeOf :: Value -> String
 typeOf (VNum _) = "INTEGER"
 typeOf (VBool _) = "BOOLEAN"
+typeOf (VString _) = "STRING"
 typeOf VNull = "NULL"
 typeOf (VReturn _) = "RETURN_VALUE"
 typeOf (VFunction _ _ _) = "FUNCTION"

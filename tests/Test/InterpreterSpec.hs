@@ -10,14 +10,9 @@ import Test.Hspec
 
 
 spec :: Spec
-spec =
-  prefixExpressionsSpec
-
-
-prefixExpressionsSpec :: Spec
-prefixExpressionsSpec = do
+spec = do
   describe "prefix expressions" $ do
-    describe "! (not)" $
+    describe "! (not)" $ do
       makeGoodExamples
         [ ("!true", VBool False)
         , ("!false", VBool True)
@@ -45,7 +40,7 @@ prefixExpressionsSpec = do
         ]
 
   describe "infix expressions" $ do
-    describe "integer arithmetic" $
+    describe "integer arithmetic" $ do
       makeGoodExamples
         [ -- Examples from page 119
           ("5 + 5", VNum 10)
@@ -266,6 +261,43 @@ prefixExpressionsSpec = do
           \factorial(5)                                                               "
         , VNum 120
         )
+      ]
+
+  describe "strings" $ do
+    makeGoodExamples
+      [ ( "let firstName = \"Thorsten\";                            \
+          \let lastName = \"Ball\";                                 \
+          \let fullName = fn(first, last) { first + \" \" + last }; \
+          \fullName(firstName, lastName);                           "
+        , VString "Thorsten Ball"
+        )
+      , ( "\"Hello world!\""
+        , VString "Hello world!"
+        )
+      , ( "let hello = \"Hello there, fellow Monkey users and fans!\"; \
+          \hello                                                       "
+        , VString "Hello there, fellow Monkey users and fans!"
+        )
+      , ( "let giveMeHello = fn() { \"Hello!\" }; \
+          \giveMeHello()                          "
+        , VString "Hello!"
+        )
+
+      -- more examples from the book, page 159
+      , ( "let makeGreeter = fn(greeting) { fn(name) { greeting + \" \" + name + \"!\" } }; \
+          \let hello = makeGreeter(\"Hello\");                                              \
+          \hello(\"Thorsten\");                                                             "
+        , VString "Hello Thorsten!"
+        )
+      , ( "let makeGreeter = fn(greeting) { fn(name) { greeting + \" \" + name + \"!\" } }; \
+          \let heythere = makeGreeter(\"Hey there\");                                       \
+          \heythere(\"Thorsten\");                                                          "
+        , VString "Hey there Thorsten!"
+        )
+      ]
+
+    makeBadExamples
+      [ ("\"Hello\" - \"World\";", UnknownOperator "STRING - STRING")
       ]
 
 

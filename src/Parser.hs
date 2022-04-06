@@ -26,6 +26,7 @@ data Expr
   = Var Id
   | Num Integer
   | Bool Bool
+  | String String
   | Equal Expr Expr
   | NotEqual Expr Expr
   | LessThan Expr Expr
@@ -138,6 +139,7 @@ primary =
   <|> bool
   <|> variable
   <|> constant
+  <|> string
   <|> group
 
 
@@ -147,6 +149,10 @@ variable = Var <$> Lexer.identifier
 
 constant :: Parser Expr
 constant = Num <$> Lexer.integer
+
+
+string :: Parser Expr
+string = String <$> Lexer.string
 
 
 bool :: Parser Expr

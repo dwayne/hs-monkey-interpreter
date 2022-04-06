@@ -12,10 +12,11 @@ Term       ::= Factor ( ( '+' | '-' ) Factor )*
 Factor     ::= Unary ( ( '*' | '/' ) Unary )*
 Unary      ::= ( '!' | '-' ) Unary | Call
 Call       ::= Primary ( '(' Args? ')' )*
-Primary    ::= Id | Number | 'true' | 'false'
+Primary    ::= Id | Number | String | 'true' | 'false'
              | 'if' '(' Expr ')' Block ( 'else' Block )?
              | 'fn' '(' Params? ')' Block
              | '(' Expr ')'
+String     ::= '"' [^"]* '"'
 
 Block  ::= '{' Stmt+ '}'
 Params ::= Id ( ',' Id )*

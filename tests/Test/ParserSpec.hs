@@ -251,6 +251,14 @@ spec = do
 
       parse input `shouldBe` Right program
 
+    it "example 31" $ do
+      let input = "\"Hello, world!\""
+      let program = Program
+                      [ ExprStmt $ String "Hello, world!"
+                      ]
+
+      parse input `shouldBe` Right program
+
   describe "book examples" $ do
     it "example 1" $ do
       let input = "                                                 \

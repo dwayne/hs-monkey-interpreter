@@ -1,6 +1,7 @@
 module Lexer
   ( identifier
   , integer
+  , string
   , reserved
   , symbol
   , whiteSpace
@@ -28,6 +29,13 @@ identifier = T.identifier monkey
 
 integer :: Parser Integer
 integer = T.lexeme monkey (read <$> P.many1 P.digit)
+
+
+string :: Parser String
+string = T.lexeme monkey (P.between quote quote (P.many stringChar))
+  where
+    quote = P.char '"'
+    stringChar = P.satisfy (\c -> c /= '"' && Char.isAscii c)
 
 
 reserved :: String -> Parser ()
