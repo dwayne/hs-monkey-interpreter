@@ -23,7 +23,7 @@ library
     -Wall
 
 
-executable monkey-repl
+executable repl
   default-language: Haskell2010
   hs-source-dirs: repl
 
@@ -34,7 +34,7 @@ executable monkey-repl
     monkey-interpreter
 
 
-test-suite monkey-interpreter-tests
+test-suite tests
   default-language: Haskell2010
   hs-source-dirs: tests
 
