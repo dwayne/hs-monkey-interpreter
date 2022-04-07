@@ -20,9 +20,13 @@ data Value
   | VNull
   | VReturn Value
   | VFunction [Id] Block Env
+  | VBuiltinFunction BuiltinFunction
 
 
 type Env = Environment Id Value
+
+
+type BuiltinFunction = [Value] -> Either Error Value
 
 
 instance Eq Value where
@@ -50,6 +54,7 @@ instance Show Value where
   show (VReturn val) = show val
 
   show (VFunction _ _ _) = "<function>"
+  show (VBuiltinFunction _) = "<builtin function>"
 
 
 data Error
@@ -58,6 +63,7 @@ data Error
   | UnknownOperator String
   | IdentifierNotFound String
   | NotAFunction String
+  | BuiltinError String
   deriving (Eq, Show)
 
 
@@ -123,8 +129,15 @@ runExpr expr env =
         Just val ->
           return (env, Right val)
 
-        Nothing ->
-          return (env, Left $ IdentifierNotFound identifier)
+        Nothing -> do
+          builtinsEnv <- builtins
+          maybeBuiltin <- Env.get identifier builtinsEnv
+          case maybeBuiltin of
+            Just val ->
+              return (env, Right val)
+
+            Nothing ->
+              return (env, Left $ IdentifierNotFound identifier)
 
     Num n ->
       return (env, Right $ VNum n)
@@ -354,6 +367,8 @@ callFunction (VFunction params body env) args = do
     err ->
       return err
 
+callFunction (VBuiltinFunction builtin) args = return $ builtin args
+
 callFunction val _ = return $ Left $ NotAFunction $ typeOf val
 
 
@@ -380,3 +395,25 @@ typeOf (VString _) = "STRING"
 typeOf VNull = "NULL"
 typeOf (VReturn _) = "RETURN_VALUE"
 typeOf (VFunction _ _ _) = "FUNCTION"
+typeOf (VBuiltinFunction _) = "BUILTIN"
+
+
+-- Builtin Functions
+
+
+builtins :: IO Env
+builtins =
+  Env.fromList
+    [ ( "len"
+      , VBuiltinFunction $ \args ->
+          case args of
+            [VString s] ->
+              Right $ VNum $ fromIntegral $ length s
+
+            [arg] ->
+              Left $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
+
+            _ ->
+              Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+      )
+    ]

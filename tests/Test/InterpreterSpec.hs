@@ -300,6 +300,18 @@ spec = do
       [ ("\"Hello\" - \"World\";", UnknownOperator "STRING - STRING")
       ]
 
+  describe "builtin functions" $ do
+    describe "len" $ do
+      makeGoodExamples
+        [ ("len(\"\")", VNum 0)
+        , ("len(\"four\")", VNum 4)
+        , ("len(\"hello world\")", VNum 11)
+        ]
+
+      makeBadExamples
+        [ ("len(1)", BuiltinError "argument to `len` not supported, got INTEGER")
+        , ("len(\"one\", \"two\")", BuiltinError "wrong number of arguments. got=2, want=1")
+        ]
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . map (second Right)

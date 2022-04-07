@@ -1,6 +1,6 @@
 module Environment
   ( Environment
-  , empty
+  , empty, fromList
   , get
   , set
   , extend
@@ -18,6 +18,10 @@ data Environment k v
 
 empty :: IO (Environment k v)
 empty = Environment <$> newIORef [Map.empty]
+
+
+fromList :: Ord k => [(k, v)] -> IO (Environment k v)
+fromList bindings = Environment <$> newIORef [Map.fromList bindings]
 
 
 get :: Ord k => k -> Environment k v -> IO (Maybe v)
