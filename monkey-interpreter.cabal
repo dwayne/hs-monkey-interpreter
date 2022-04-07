@@ -17,7 +17,8 @@ library
     Environment,
     Interpreter,
     Lexer,
-    Parser
+    Parser,
+    Runtime
 
   ghc-options:
     -Wall

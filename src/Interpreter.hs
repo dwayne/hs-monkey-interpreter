@@ -6,64 +6,17 @@ module Interpreter
 
 
 import qualified Environment as Env
+import qualified Runtime
 
 import Control.Monad (join, liftM2)
-import Environment (Environment)
+import Data.Bifunctor (first)
 import Parser
-import Text.Parsec (ParseError)
-
-
-data Value
-  = VNum Integer
-  | VBool Bool
-  | VString String
-  | VNull
-  | VReturn Value
-  | VFunction [Id] Block Env
-  | VBuiltinFunction BuiltinFunction
-
-
-type Env = Environment Id Value
-
-
-type BuiltinFunction = [Value] -> Either Error Value
-
-
-instance Eq Value where
-  VNum a == VNum b = a == b
-  VBool a == VBool b = a == b
-  VString a == VString b = a == b
-  VNull == VNull = True
-
-  VReturn aVal == bVal = aVal == bVal
-  aVal == VReturn bVal = aVal == bVal
-
-  _ == _ = False
-
-
-instance Show Value where
-  show (VNum n) = show n
-
-  show (VBool True) = "true"
-  show (VBool False) = "false"
-
-  show (VString s) = s
-
-  show VNull = "null"
-
-  show (VReturn val) = show val
-
-  show (VFunction _ _ _) = "<function>"
-  show (VBuiltinFunction _) = "<builtin function>"
+import Runtime hiding (Error)
 
 
 data Error
   = SyntaxError ParseError
-  | TypeMismatch String
-  | UnknownOperator String
-  | IdentifierNotFound String
-  | NotAFunction String
-  | BuiltinError String
+  | RuntimeError Runtime.Error
   deriving (Eq, Show)
 
 
@@ -71,18 +24,18 @@ run :: String -> Env -> IO (Env, Either Error Value)
 run input env =
   case parse input of
     Right program ->
-      runProgram program env
+      fmap (fmap (first RuntimeError)) $ runProgram program env
 
     Left parseError ->
       return (env, Left $ SyntaxError parseError)
 
 
-runProgram :: Program -> Env -> IO (Env, Either Error Value)
+runProgram :: Program -> Env -> IO (Env, Either Runtime.Error Value)
 runProgram (Program stmts) env =
   fmap (fmap (fmap returned)) $ runBlock stmts env
 
 
-runBlock :: Block -> Env -> IO (Env, Either Error Value)
+runBlock :: Block -> Env -> IO (Env, Either Runtime.Error Value)
 runBlock [] env = return (env, Right VNull)
 runBlock [stmt] env = runStmt stmt env
 runBlock (stmt : rest) env = do
@@ -99,7 +52,7 @@ runBlock (stmt : rest) env = do
       return (env', Left err)
 
 
-runStmt :: Stmt -> Env -> IO (Env, Either Error Value)
+runStmt :: Stmt -> Env -> IO (Env, Either Runtime.Error Value)
 runStmt stmt env =
   case stmt of
     Let identifier expr -> do
@@ -120,7 +73,7 @@ runStmt stmt env =
       runExpr expr env
 
 
-runExpr :: Expr -> Env -> IO (Env, Either Error Value)
+runExpr :: Expr -> Env -> IO (Env, Either Runtime.Error Value)
 runExpr expr env =
   case expr of
     Var identifier -> do
@@ -258,7 +211,7 @@ runExpr expr env =
           return (env, Left err)
 
 
-runExprs :: [Expr] -> Env -> IO (Either Error [Value])
+runExprs :: [Expr] -> Env -> IO (Either Runtime.Error [Value])
 runExprs exprs env = helper exprs []
   where
     helper [] vals = return $ Right $ reverse vals
@@ -272,18 +225,18 @@ runExprs exprs env = helper exprs []
           return $ Left err
 
 
-performNot :: Value -> Either Error Value
+performNot :: Value -> Either Runtime.Error Value
 performNot (VBool b) = Right $ VBool $ not b
 performNot VNull = Right $ VBool True
 performNot _ = Right $ VBool False
 
 
-performNegate :: Value -> Either Error Value
+performNegate :: Value -> Either Runtime.Error Value
 performNegate (VNum n) = Right $ VNum $ negate n
 performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
 
 
-performAdd :: Value -> Value -> Either Error Value
+performAdd :: Value -> Value -> Either Runtime.Error Value
 performAdd (VNum a) (VNum b) = Right $ VNum $ a + b
 performAdd (VString a) (VString b) = Right $ VString $ a ++ b
 performAdd aVal bVal
@@ -294,7 +247,7 @@ performAdd aVal bVal
     tb = typeOf bVal
 
 
-performSub :: Value -> Value -> Either Error Value
+performSub :: Value -> Value -> Either Runtime.Error Value
 performSub (VNum a) (VNum b) = Right $ VNum $ a - b
 performSub aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " - " ++ tb
@@ -304,7 +257,7 @@ performSub aVal bVal
     tb = typeOf bVal
 
 
-performMul :: Value -> Value -> Either Error Value
+performMul :: Value -> Value -> Either Runtime.Error Value
 performMul (VNum a) (VNum b) = Right $ VNum $ a * b
 performMul aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " * " ++ tb
@@ -314,7 +267,7 @@ performMul aVal bVal
     tb = typeOf bVal
 
 
-performDiv :: Value -> Value -> Either Error Value
+performDiv :: Value -> Value -> Either Runtime.Error Value
 performDiv (VNum a) (VNum b) = Right $ VNum $ a `div` b
 performDiv aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " / " ++ tb
@@ -324,7 +277,7 @@ performDiv aVal bVal
     tb = typeOf bVal
 
 
-performLessThan :: Value -> Value -> Either Error Value
+performLessThan :: Value -> Value -> Either Runtime.Error Value
 performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
 performLessThan aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " < " ++ tb
@@ -334,7 +287,7 @@ performLessThan aVal bVal
     tb = typeOf bVal
 
 
-performGreaterThan :: Value -> Value -> Either Error Value
+performGreaterThan :: Value -> Value -> Either Runtime.Error Value
 performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
 performGreaterThan aVal bVal
   | ta /= tb = Left $ TypeMismatch $ ta ++ " > " ++ tb
@@ -344,19 +297,19 @@ performGreaterThan aVal bVal
     tb = typeOf bVal
 
 
-performEqual :: Value -> Value -> Either Error Value
+performEqual :: Value -> Value -> Either Runtime.Error Value
 performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
 performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
 performEqual _ _ = Right $ VBool False
 
 
-performNotEqual :: Value -> Value -> Either Error Value
+performNotEqual :: Value -> Value -> Either Runtime.Error Value
 performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
 performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
 performNotEqual _ _ = Right $ VBool True
 
 
-callFunction :: Value -> [Value] -> IO (Either Error Value)
+callFunction :: Value -> [Value] -> IO (Either Runtime.Error Value)
 callFunction (VFunction params body env) args = do
   extendedEnv <- Env.extend (zip params args) env
   (_, eitherVal) <- runBlock body extendedEnv
@@ -370,50 +323,3 @@ callFunction (VFunction params body env) args = do
 callFunction (VBuiltinFunction builtin) args = return $ builtin args
 
 callFunction val _ = return $ Left $ NotAFunction $ typeOf val
-
-
-isTruthy :: Value -> Bool
-isTruthy VNull = False
-isTruthy (VBool False) = False
-isTruthy _ = True
-
-
-isReturned :: Value -> Bool
-isReturned (VReturn _) = True
-isReturned _ = False
-
-
-returned :: Value -> Value
-returned (VReturn val) = returned val
-returned val = val
-
-
-typeOf :: Value -> String
-typeOf (VNum _) = "INTEGER"
-typeOf (VBool _) = "BOOLEAN"
-typeOf (VString _) = "STRING"
-typeOf VNull = "NULL"
-typeOf (VReturn _) = "RETURN_VALUE"
-typeOf (VFunction _ _ _) = "FUNCTION"
-typeOf (VBuiltinFunction _) = "BUILTIN"
-
-
--- Builtin Functions
-
-
-builtins :: IO Env
-builtins =
-  Env.fromList
-    [ ( "len"
-      , VBuiltinFunction $ \args ->
-          case args of
-            [VString s] ->
-              Right $ VNum $ fromIntegral $ length s
-
-            [arg] ->
-              Left $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
-
-            _ ->
-              Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
-      )
-    ]

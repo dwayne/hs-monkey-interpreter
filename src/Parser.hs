@@ -1,6 +1,9 @@
 module Parser
   ( Program(..), Stmt(..), Expr(..), Id, Block
   , parse
+
+  -- re-export from Text.Parsec for convenience
+  , ParseError
   )
   where
 

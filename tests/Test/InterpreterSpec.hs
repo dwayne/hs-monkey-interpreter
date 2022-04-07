@@ -2,10 +2,10 @@ module Test.InterpreterSpec (spec) where
 
 
 import qualified Environment as Env
+import qualified Runtime
 
-
-import Data.Bifunctor (second)
 import Interpreter (run, Value(..), Error(..))
+import Runtime hiding (Error)
 import Test.Hspec
 
 
@@ -314,11 +314,11 @@ spec = do
         ]
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
-makeGoodExamples = makeExamples . map (second Right)
+makeGoodExamples = makeExamples . fmap (fmap Right)
 
 
-makeBadExamples :: [(String, Error)] -> SpecWith (Arg Expectation)
-makeBadExamples = makeExamples . map (second Left)
+makeBadExamples :: [(String, Runtime.Error)] -> SpecWith (Arg Expectation)
+makeBadExamples = makeExamples . fmap (fmap (Left . RuntimeError))
 
 
 makeExamples :: [(String, Either Error Value)] -> SpecWith (Arg Expectation)
