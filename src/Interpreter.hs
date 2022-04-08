@@ -101,6 +101,16 @@ runExpr expr env =
     String s ->
       return (env, Right $ VString s)
 
+    Array exprs -> do
+      eitherVals <- runExprs exprs env
+
+      case eitherVals of
+        Right vals ->
+          return (env, Right $ VArray vals)
+
+        Left err ->
+          return (env, Left err)
+
     Not a -> do
       (env', eitherVal) <- runExpr a env
       return (env', eitherVal >>= performNot)

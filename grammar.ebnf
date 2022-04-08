@@ -12,15 +12,17 @@ Term       ::= Factor ( ( '+' | '-' ) Factor )*
 Factor     ::= Unary ( ( '*' | '/' ) Unary )*
 Unary      ::= ( '!' | '-' ) Unary | Call
 Call       ::= Primary ( '(' Args? ')' )*
-Primary    ::= Id | Number | String | 'true' | 'false'
+Primary    ::= Id | Number | String | Array | 'true' | 'false'
              | 'if' '(' Expr ')' Block ( 'else' Block )?
              | 'fn' '(' Params? ')' Block
              | '(' Expr ')'
 String     ::= '"' [^"]* '"'
+Array      ::= '[' ExprList? ']'
 
-Block  ::= '{' Stmt+ '}'
-Params ::= Id ( ',' Id )*
-Args   ::= Expr ( ',' Expr )*
+Block    ::= '{' Stmt+ '}'
+Params   ::= Id ( ',' Id )*
+Args     ::= ExprList
+ExprList ::= Expr ( ',' Expr )*
 
 Id     ::= [a-zA-Z_]+
 Number ::= [0-9]+

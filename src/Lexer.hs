@@ -7,6 +7,7 @@ module Lexer
   , whiteSpace
   , parens
   , braces
+  , brackets
   , semicolon
   , commaSep
   )
@@ -56,6 +57,10 @@ parens = T.parens monkey
 
 braces :: Parser a -> Parser a
 braces = T.braces monkey
+
+
+brackets :: Parser a -> Parser a
+brackets = T.brackets monkey
 
 
 semicolon :: Parser String

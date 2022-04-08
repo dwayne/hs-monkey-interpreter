@@ -313,6 +313,27 @@ spec = do
         , ("len(\"one\", \"two\")", BuiltinError "wrong number of arguments. got=2, want=1")
         ]
 
+  describe "arrays" $ do
+    makeGoodExamples
+      [ ("[]", VArray [])
+      , ("[1]", VArray [VNum 1])
+      , ("[1, 2]", VArray [VNum 1, VNum 2])
+      , ("[1, false, true, \"four\", [], [[]]]"
+        , VArray
+            [ VNum 1
+            , VBool False
+            , VBool True
+            , VString "four"
+            , VArray []
+            , VArray [VArray []]
+            ]
+        )
+      , ( "let myArray = [\"one\", \"two\", \"three\"]; \
+          \len(myArray)                                 "
+        , VNum 3
+        )
+      ]
+
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . fmap (fmap Right)
 

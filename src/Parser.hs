@@ -30,6 +30,7 @@ data Expr
   | Num Integer
   | Bool Bool
   | String String
+  | Array [Expr]
   | Equal Expr Expr
   | NotEqual Expr Expr
   | LessThan Expr Expr
@@ -143,6 +144,7 @@ primary =
   <|> variable
   <|> constant
   <|> string
+  <|> array
   <|> group
 
 
@@ -156,6 +158,12 @@ constant = Num <$> Lexer.integer
 
 string :: Parser Expr
 string = String <$> Lexer.string
+
+
+array :: Parser Expr
+array = Array <$> exprList
+  where
+    exprList = Lexer.brackets $ Lexer.commaSep expr
 
 
 bool :: Parser Expr

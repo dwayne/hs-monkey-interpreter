@@ -7,7 +7,7 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-  describe "examples" $ do
+  describe "parser" $ do
     it "example 1" $ do
       let input = "x"
       let program = Program
@@ -255,6 +255,44 @@ spec = do
       let input = "\"Hello, world!\""
       let program = Program
                       [ ExprStmt $ String "Hello, world!"
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 32" $ do
+      let input = "[]"
+      let program = Program
+                      [ ExprStmt $ Array []
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 33" $ do
+      let input = "[1]"
+      let program = Program
+                      [ ExprStmt $ Array [Num 1]
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 34" $ do
+      let input = "[1, 2]"
+      let program = Program
+                      [ ExprStmt $ Array [Num 1, Num 2]
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 35" $ do
+      let input = "[\"Thorsten\", \"Ball\", 28, fn(x) { x * x }]"
+      let program = Program
+                      [ ExprStmt $
+                          Array
+                            [ String "Thorsten"
+                            , String "Ball"
+                            , Num 28
+                            , Function ["x"] [ ExprStmt $ Mul (Var "x") (Var "x") ]
+                            ]
                       ]
 
       parse input `shouldBe` Right program
