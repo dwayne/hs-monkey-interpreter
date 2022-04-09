@@ -297,6 +297,72 @@ spec = do
 
       parse input `shouldBe` Right program
 
+    it "example 36" $ do
+      let input = "myArray[1 + 1]"
+      let program = Program
+                      [ ExprStmt $ Index (Var "myArray") (Add (Num 1) (Num 1))
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 37" $ do
+      let input = "a * [1, 2, 3, 4][b * c] * d"
+      let program = Program
+                      [ ExprStmt $
+                          Mul
+                            (Mul (Var "a") (Index (Array [Num 1, Num 2, Num 3, Num 4]) (Mul (Var "b") (Var "c"))))
+                            (Var "d")
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 38" $ do
+      let input = "add(a * b[2], b[1], 2 * [1, 2][1])"
+      let program = Program
+                      [ ExprStmt $
+                          Call
+                            (Var "add")
+                            [ Mul (Var "a") (Index (Var "b") (Num 2))
+                            , Index (Var "b") (Num 1)
+                            , Mul (Num 2) (Index (Array [Num 1, Num 2]) (Num 1))
+                            ]
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 39" $ do
+      let input = "a[0][1][2]"
+      let program = Program
+                      [ ExprStmt $
+                          Index
+                            (Index (Index (Var "a") (Num 0)) (Num 1))
+                            (Num 2)
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 40" $ do
+      let input = "a(0)[1](2)[3]"
+      let program = Program
+                      [ ExprStmt $
+                          Index
+                            (Call (Index (Call (Var "a") [Num 0]) (Num 1)) [Num 2])
+                            (Num 3)
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 41" $ do
+      let input = "a[0](1)[2](3)"
+      let program = Program
+                      [ ExprStmt $
+                          Call
+                            (Index (Call (Index (Var "a") (Num 0)) [Num 1]) (Num 2))
+                            [Num 3]
+                      ]
+
+      parse input `shouldBe` Right program
+
   describe "book examples" $ do
     it "example 1" $ do
       let input = "                                                 \

@@ -42,6 +42,7 @@ data Expr
   | Not Expr
   | Negate Expr
   | Call Expr [Expr]
+  | Index Expr Expr
   | If Expr Block (Maybe Block)
   | Function [Id] Block
   deriving (Eq, Show)
@@ -123,17 +124,21 @@ factor = unary `P.chainl1` factorOp
 
 
 unary :: Parser Expr
-unary = unaryOp <*> unary <|> call
+unary = unaryOp <*> unary <|> operator
   where
     unaryOp = notOp <|> negateOp
     notOp = Not <$ Lexer.symbol "!"
     negateOp = Negate <$ Lexer.symbol "-"
 
 
-call :: Parser Expr
-call = foldl Call <$> primary <*> P.many args
+operator :: Parser Expr
+operator = foldl (flip ($)) <$> primary <*> (P.many (args <|> index))
   where
-    args = Lexer.parens $ Lexer.commaSep expr
+    args :: Parser (Expr -> Expr)
+    args = flip Call <$> (Lexer.parens $ Lexer.commaSep expr)
+
+    index :: Parser (Expr -> Expr)
+    index = flip Index <$> (Lexer.brackets expr)
 
 
 primary :: Parser Expr
