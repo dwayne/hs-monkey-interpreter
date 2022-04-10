@@ -334,6 +334,60 @@ spec = do
         )
       ]
 
+    describe "builtins" $ do
+      describe "first" $ do
+        makeGoodExamples
+          [ ("first([])", VNull)
+          , ("first([1])", VNum 1)
+          , ("first([1, 2])", VNum 1)
+          ]
+
+        makeBadExamples
+          [ ("first(1)", BuiltinError "argument to `first` must be ARRAY, got INTEGER")
+          , ("first([], 1)", BuiltinError "wrong number of arguments. got=2, want=1")
+          ]
+
+      describe "last" $ do
+        makeGoodExamples
+          [ ("last([])", VNull)
+          , ("last([1])", VNum 1)
+          , ("last([1, 2])", VNum 2)
+          , ("last([1, 2, 3])", VNum 3)
+          ]
+
+        makeBadExamples
+          [ ("last(1)", BuiltinError "argument to `last` must be ARRAY, got INTEGER")
+          , ("last([], 1)", BuiltinError "wrong number of arguments. got=2, want=1")
+          ]
+
+      describe "rest" $ do
+        makeGoodExamples
+          [ ("rest([])", VNull)
+          , ("rest([1])", VArray [])
+          , ("rest([1, 2])", VArray [VNum 2])
+          , ("rest([1, 2, 3])", VArray [VNum 2, VNum 3])
+          , ("rest(rest([1, 2, 3]))", VArray [VNum 3])
+          ]
+
+        makeBadExamples
+          [ ("rest(1)", BuiltinError "argument to `rest` must be ARRAY, got INTEGER")
+          , ("rest([], 1)", BuiltinError "wrong number of arguments. got=2, want=1")
+          ]
+
+      describe "push" $ do
+        makeGoodExamples
+          [ ("push([], 1)", VArray [VNum 1])
+          , ("push([1], 2)", VArray [VNum 1, VNum 2])
+          , ("push([1, 2], 3)", VArray [VNum 1, VNum 2, VNum 3])
+          , ("push(push(push([], 1), 2), 3)", VArray [VNum 1, VNum 2, VNum 3])
+          ]
+
+        makeBadExamples
+          [ ("push(1, true)", BuiltinError "argument to `push` must be ARRAY, got INTEGER")
+          , ("push([])", BuiltinError "wrong number of arguments. got=1, want=2")
+          , ("push([], 1, true)", BuiltinError "wrong number of arguments. got=3, want=2")
+          ]
+
   describe "index operator" $ do
     makeGoodExamples
       [ ( "[1, 2, 3][0]"
@@ -376,6 +430,7 @@ spec = do
         , TypeMismatch "ARRAY[BOOLEAN]"
         )
       ]
+
 
 makeGoodExamples :: [(String, Value)] -> SpecWith (Arg Expectation)
 makeGoodExamples = makeExamples . fmap (fmap Right)

@@ -105,6 +105,10 @@ builtins :: IO Env
 builtins =
   Env.fromList $ map (fmap VBuiltinFunction)
     [ ("len", builtinLen)
+    , ("first", builtinFirst)
+    , ("last", builtinLast)
+    , ("rest", builtinRest)
+    , ("push", builtinPush)
     ]
 
 
@@ -122,3 +126,64 @@ builtinLen args =
 
     _ ->
       Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+
+
+builtinFirst :: BuiltinFunction
+builtinFirst args =
+  case args of
+    [VArray []] ->
+      Right VNull
+
+    [VArray (x:_)] ->
+      Right x
+
+    [arg] ->
+      Left $ BuiltinError $ "argument to `first` must be ARRAY, got " ++ typeOf arg
+
+    _ ->
+      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+
+
+builtinLast :: BuiltinFunction
+builtinLast args =
+  case args of
+    [VArray []] ->
+      Right VNull
+
+    [VArray arr] ->
+      Right $ last arr
+
+    [arg] ->
+      Left $ BuiltinError $ "argument to `last` must be ARRAY, got " ++ typeOf arg
+
+    _ ->
+      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+
+
+builtinRest :: BuiltinFunction
+builtinRest args =
+  case args of
+    [VArray []] ->
+      Right VNull
+
+    [VArray (_:rest)] ->
+      Right $ VArray rest
+
+    [arg] ->
+      Left $ BuiltinError $ "argument to `rest` must be ARRAY, got " ++ typeOf arg
+
+    _ ->
+      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+
+
+builtinPush :: BuiltinFunction
+builtinPush args =
+  case args of
+    [VArray arr, val] ->
+      Right $ VArray $ arr ++ [val]
+
+    [subject, _] ->
+      Left $ BuiltinError $ "argument to `push` must be ARRAY, got " ++ typeOf subject
+
+    _ ->
+      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=2"
