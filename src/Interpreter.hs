@@ -10,6 +10,7 @@ import qualified Runtime
 
 import Control.Monad (join, liftM2)
 import Data.Bifunctor (first)
+import Data.List (genericIndex, genericLength)
 import Parser
 import Runtime hiding (Error)
 
@@ -220,6 +221,23 @@ runExpr expr env =
         Left err ->
           return (env, Left err)
 
+    Index aExpr iExpr -> do
+      (_, eitherAVal) <- runExpr aExpr env
+
+      case eitherAVal of
+        Right aVal -> do
+          (_, eitherIVal) <- runExpr iExpr env
+
+          case eitherIVal of
+            Right iVal -> do
+              return (env, getValueAt aVal iVal)
+
+            Left err ->
+              return (env, Left err)
+
+        Left err ->
+          return (env, Left err)
+
 
 runExprs :: [Expr] -> Env -> IO (Either Runtime.Error [Value])
 runExprs exprs env = helper exprs []
@@ -333,3 +351,11 @@ callFunction (VFunction params body env) args = do
 callFunction (VBuiltinFunction builtin) args = return $ builtin args
 
 callFunction val _ = return $ Left $ NotAFunction $ typeOf val
+
+
+getValueAt :: Value -> Value -> Either Runtime.Error Value
+getValueAt (VArray arr) (VNum n)
+  | n >= 0 && n < genericLength arr = Right $ genericIndex arr n
+  | otherwise = Right VNull
+
+getValueAt a i = Left $ TypeMismatch $ typeOf a ++ "[" ++ typeOf i ++ "]"
