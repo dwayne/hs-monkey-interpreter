@@ -2,6 +2,7 @@ module Test.InterpreterSpec (spec) where
 
 
 import qualified Environment as Env
+import qualified Hash
 import qualified Runtime
 
 import Interpreter (run, Value(..), Error(..))
@@ -387,6 +388,43 @@ spec = do
           , ("push([])", BuiltinError "wrong number of arguments. got=1, want=2")
           , ("push([], 1, true)", BuiltinError "wrong number of arguments. got=3, want=2")
           ]
+
+  describe "hashes" $ do
+    makeGoodExamples
+      [ ( "{}"
+        , VHash $ Hash.fromList []
+        )
+      , ( "{\"name\": \"Jimmy\", \"age\": 72, \"band\": \"Led Zeppelin\"}"
+        , VHash $ Hash.fromList
+            [ (Hash.KString "name", VString "Jimmy")
+            , (Hash.KString "age", VNum 72)
+            , (Hash.KString "band", VString "Led Zeppelin")
+            ]
+        )
+      , ( "{true: \"yes, a boolean\", 99: \"correct, an integer\"}"
+        , VHash $ Hash.fromList
+            [ (Hash.KBool True, VString "yes, a boolean")
+            , (Hash.KNum 99, VString "correct, an integer")
+            ]
+        )
+      , ( "let two = \"two\";       \
+          \{ \"one\": 10 - 9        \
+          \, two: 1 + 1             \
+          \,\"thr\" + \"ee\": 6 / 2 \
+          \,4: 4                    \
+          \,true: 5                 \
+          \,false: 6                \
+          \}                        "
+        , VHash $ Hash.fromList
+            [ (Hash.KString "one", VNum 1)
+            , (Hash.KString "two", VNum 2)
+            , (Hash.KString "three", VNum 3)
+            , (Hash.KNum 4, VNum 4)
+            , (Hash.KBool True, VNum 5)
+            , (Hash.KBool False, VNum 6)
+            ]
+        )
+      ]
 
   describe "index operator" $ do
     makeGoodExamples

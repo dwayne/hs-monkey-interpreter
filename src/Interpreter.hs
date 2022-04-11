@@ -6,6 +6,7 @@ module Interpreter
 
 
 import qualified Environment as Env
+import qualified Hash
 import qualified Runtime
 
 import Control.Monad (join, liftM2)
@@ -112,8 +113,15 @@ runExpr expr env =
         Left err ->
           return (env, Left err)
 
-    Hash _ ->
-      return (env, Right VNull)
+    Hash kvExprs -> do
+      eitherKVS <- runKVExprs kvExprs env
+
+      case eitherKVS of
+        Right kvs ->
+          return (env, Right $ VHash $ Hash.fromList kvs)
+
+        Left err ->
+          return (env, Left err)
 
     Not a -> do
       (env', eitherVal) <- runExpr a env
@@ -256,6 +264,31 @@ runExprs exprs env = helper exprs []
           return $ Left err
 
 
+runKVExprs :: [(Expr, Expr)] -> Env -> IO (Either Runtime.Error [(Hash.Key, Value)])
+runKVExprs kvExprs env = helper kvExprs []
+  where
+    helper [] kvs = return $ Right kvs
+    helper ((kExpr, vExpr):rest) kvs = do
+      (_, eitherKey) <- runExpr kExpr env
+      case eitherKey of
+        Right kVal ->
+          case toKey kVal of
+            Right key -> do
+              (_, eitherVal) <- runExpr vExpr env
+              case eitherVal of
+                Right val ->
+                  helper rest ((key, val) : kvs)
+
+                Left err ->
+                  return $ Left err
+
+            Left err ->
+              return $ Left err
+
+        Left err ->
+          return $ Left err
+
+
 performNot :: Value -> Either Runtime.Error Value
 performNot (VBool b) = Right $ VBool $ not b
 performNot VNull = Right $ VBool True
@@ -362,3 +395,10 @@ getValueAt (VArray arr) (VNum n)
   | otherwise = Right VNull
 
 getValueAt a i = Left $ TypeMismatch $ typeOf a ++ "[" ++ typeOf i ++ "]"
+
+
+toKey :: Value -> Either Runtime.Error Hash.Key
+toKey (VNum n) = Right $ Hash.KNum n
+toKey (VBool b) = Right $ Hash.KBool b
+toKey (VString s) = Right $ Hash.KString s
+toKey v = Left $ TypeMismatch $ "unusable as hash key: " ++ typeOf v

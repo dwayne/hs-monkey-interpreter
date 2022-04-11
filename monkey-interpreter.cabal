@@ -15,6 +15,7 @@ library
 
   exposed-modules:
     Environment,
+    Hash,
     Interpreter,
     Lexer,
     Parser,
