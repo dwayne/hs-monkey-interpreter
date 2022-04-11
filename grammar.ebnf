@@ -12,17 +12,21 @@ Term       ::= Factor ( ( '+' | '-' ) Factor )*
 Factor     ::= Unary ( ( '*' | '/' ) Unary )*
 Unary      ::= ( '!' | '-' ) Unary | Operator
 Operator   ::= Primary ( '(' Args? ')' | '[' Expr ']' )*
-Primary    ::= Id | Number | String | Array | 'true' | 'false'
+Primary    ::= Id | Number | String | Array | Hash | 'true' | 'false'
              | 'if' '(' Expr ')' Block ( 'else' Block )?
              | 'fn' '(' Params? ')' Block
              | '(' Expr ')'
 String     ::= '"' [^"]* '"'
 Array      ::= '[' ExprList? ']'
+Hash       ::= '{' KeyValueList? '}'
 
 Block    ::= '{' Stmt+ '}'
 Params   ::= Id ( ',' Id )*
 Args     ::= ExprList
 ExprList ::= Expr ( ',' Expr )*
+
+KeyValueList ::= KeyValue ( ',' KeyValue )*
+KeyValue     ::= Expr ':' Expr
 
 Id     ::= [a-zA-Z_]+
 Number ::= [0-9]+

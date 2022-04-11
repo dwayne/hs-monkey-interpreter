@@ -112,6 +112,9 @@ runExpr expr env =
         Left err ->
           return (env, Left err)
 
+    Hash _ ->
+      return (env, Right VNull)
+
     Not a -> do
       (env', eitherVal) <- runExpr a env
       return (env', eitherVal >>= performNot)

@@ -31,6 +31,7 @@ data Expr
   | Bool Bool
   | String String
   | Array [Expr]
+  | Hash [(Expr, Expr)]
   | Equal Expr Expr
   | NotEqual Expr Expr
   | LessThan Expr Expr
@@ -150,6 +151,7 @@ primary =
   <|> constant
   <|> string
   <|> array
+  <|> hash
   <|> group
 
 
@@ -169,6 +171,14 @@ array :: Parser Expr
 array = Array <$> exprList
   where
     exprList = Lexer.brackets $ Lexer.commaSep expr
+
+
+hash :: Parser Expr
+hash = Hash <$> keyValueList
+  where
+    keyValueList = Lexer.braces $ Lexer.commaSep keyValue
+    keyValue = (,) <$> expr <* colon <*> expr
+    colon = Lexer.symbol ":"
 
 
 bool :: Parser Expr

@@ -363,6 +363,50 @@ spec = do
 
       parse input `shouldBe` Right program
 
+  describe "hash literals" $ do
+    it "example 1" $ do
+      let input = "{}"
+      let program = Program
+                      [ ExprStmt $ Hash []
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 2" $ do
+      let input = "{\"name\": \"Jimmy\", \"age\": 72, \"band\": \"Led Zeppelin\"}"
+      let program = Program
+                      [ ExprStmt $ Hash
+                          [ (String "name", String "Jimmy")
+                          , (String "age", Num 72)
+                          , (String "band", String "Led Zeppelin")
+                          ]
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 3" $ do
+      let input = "{true: \"yes, a boolean\", 99: \"correct, an integer\"}"
+      let program = Program
+                      [ ExprStmt $ Hash
+                          [ (Bool True, String "yes, a boolean")
+                          , (Num 99, String "correct, an integer")
+                          ]
+                      ]
+
+      parse input `shouldBe` Right program
+
+    it "example 4" $ do
+      let input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}"
+      let program = Program
+                      [ ExprStmt $ Hash
+                          [ (String "one", Add (Num 0) (Num 1))
+                          , (String "two", Sub (Num 10) (Num 8))
+                          , (String "three", Div (Num 15) (Num 5))
+                          ]
+                      ]
+
+      parse input `shouldBe` Right program
+
   describe "book examples" $ do
     it "example 1" $ do
       let input = "                                                 \
