@@ -427,38 +427,64 @@ spec = do
       ]
 
   describe "index operator" $ do
-    makeGoodExamples
-      [ ( "[1, 2, 3][0]"
-        , VNum 1
-        )
-      , ( "[1, 2, 3][1]"
-        , VNum 2
-        )
-      , ( "[1, 2, 3][2]"
-        , VNum 3
-        )
-      , ( "let i = 0; [1][i];"
-        , VNum 1
-        )
-      , ( "[1, 2, 3][1 + 1];"
-        , VNum 3
-        )
-      , ( "let myArray = [1, 2, 3]; myArray[2];"
-        , VNum 3
-        )
-      , ( "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];"
-        , VNum 6
-        )
-      , ( "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]"
-        , VNum 2
-        )
-      , ( "[1, 2, 3][3]"
-        , VNull
-        )
-      , ( "[1, 2, 3][-1]"
-        , VNull
-        )
-      ]
+    describe "for arrays" $ do
+      makeGoodExamples
+        [ ( "[1, 2, 3][0]"
+          , VNum 1
+          )
+        , ( "[1, 2, 3][1]"
+          , VNum 2
+          )
+        , ( "[1, 2, 3][2]"
+          , VNum 3
+          )
+        , ( "let i = 0; [1][i];"
+          , VNum 1
+          )
+        , ( "[1, 2, 3][1 + 1];"
+          , VNum 3
+          )
+        , ( "let myArray = [1, 2, 3]; myArray[2];"
+          , VNum 3
+          )
+        , ( "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];"
+          , VNum 6
+          )
+        , ( "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]"
+          , VNum 2
+          )
+        , ( "[1, 2, 3][3]"
+          , VNull
+          )
+        , ( "[1, 2, 3][-1]"
+          , VNull
+          )
+        ]
+
+    describe "for hashes" $ do
+      makeGoodExamples
+        [ ( "{\"foo\": 5}[\"foo\"]"
+          , VNum 5
+          )
+        , ( "{\"foo\": 5}[\"bar\"]"
+          , VNull
+          )
+        , ( "let key = \"foo\"; {\"foo\": 5}[key]"
+          , VNum 5
+          )
+        , ( "{}[\"foo\"]"
+          , VNull
+          )
+        , ( "{5: 5}[5]"
+          , VNum 5
+          )
+        , ( "{true: 5}[true]"
+          , VNum 5
+          )
+        , ( "{false: 5}[false]"
+          , VNum 5
+          )
+        ]
 
     makeBadExamples
       [ ( "1[0]"
@@ -467,7 +493,37 @@ spec = do
       , ( "[1][false]"
         , TypeMismatch "ARRAY[BOOLEAN]"
         )
+      , ( "{\"name\": \"Monkey\"}[fn(x) { x }]"
+        , TypeMismatch "HASH[FUNCTION]"
+        )
       ]
+
+    describe "misc examples" $ do
+      -- see page 197
+      makeGoodExamples
+        [ ( "let people = [{\"name\": \"Alice\", \"age\": 24}, {\"name\": \"Anna\", \"age\": 28}]; \
+            \people[0][\"name\"];                                                                  "
+          , VString "Alice"
+          )
+        , ( "let people = [{\"name\": \"Alice\", \"age\": 24}, {\"name\": \"Anna\", \"age\": 28}]; \
+            \people[1][\"age\"];                                                                   "
+          , VNum 28
+          )
+        , ( "let people = [{\"name\": \"Alice\", \"age\": 24}, {\"name\": \"Anna\", \"age\": 28}]; \
+            \people[1][\"age\"] + people[0][\"age\"];                                              "
+          , VNum 52
+          )
+        , ( "let people = [{\"name\": \"Alice\", \"age\": 24}, {\"name\": \"Anna\", \"age\": 28}]; \
+            \let getName = fn(person) { person[\"name\"]; };                                       \
+            \getName(people[0]);                                                                   "
+          , VString "Alice"
+          )
+        , ( "let people = [{\"name\": \"Alice\", \"age\": 24}, {\"name\": \"Anna\", \"age\": 28}]; \
+            \let getName = fn(person) { person[\"name\"]; };                                       \
+            \getName(people[1]);                                                                   "
+          , VString "Anna"
+          )
+        ]
 
   describe "test-driving arrays" $ do
     -- see page 180-181

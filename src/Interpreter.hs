@@ -394,6 +394,15 @@ getValueAt (VArray arr) (VNum n)
   | n >= 0 && n < genericLength arr = Right $ genericIndex arr n
   | otherwise = Right VNull
 
+getValueAt (VHash hash) (VNum n) =
+  maybe (Right VNull) Right $ Hash.find (Hash.KNum n) hash
+
+getValueAt (VHash hash) (VBool b) =
+  maybe (Right VNull) Right $ Hash.find (Hash.KBool b) hash
+
+getValueAt (VHash hash) (VString s) =
+  maybe (Right VNull) Right $ Hash.find (Hash.KString s) hash
+
 getValueAt a i = Left $ TypeMismatch $ typeOf a ++ "[" ++ typeOf i ++ "]"
 
 

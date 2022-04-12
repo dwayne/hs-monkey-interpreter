@@ -1,6 +1,7 @@
 module Hash
   ( Hash, Key(..)
   , fromList
+  , find
   , toList
   ) where
 
@@ -27,6 +28,10 @@ instance Show Key where
 
 fromList :: [(Key, v)] -> Hash v
 fromList = Hash . Map.fromList
+
+
+find :: Key -> Hash v -> Maybe v
+find k (Hash m) = Map.lookup k m
 
 
 toList :: Hash v -> [(Key, v)]
