@@ -384,7 +384,7 @@ callFunction (VFunction params body env) args = do
     err ->
       return err
 
-callFunction (VBuiltinFunction builtin) args = return $ builtin args
+callFunction (VBuiltinFunction builtin) args = builtin args
 
 callFunction val _ = return $ Left $ NotAFunction $ typeOf val
 

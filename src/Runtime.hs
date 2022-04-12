@@ -26,7 +26,7 @@ data Value
 type Env = Environment Id Value
 type Hash = Hash.Hash Value
 
-type BuiltinFunction = [Value] -> Either Error Value
+type BuiltinFunction = [Value] -> IO (Either Error Value)
 
 data Error
   = TypeMismatch String
@@ -123,81 +123,97 @@ builtins =
     , ("last", builtinLast)
     , ("rest", builtinRest)
     , ("push", builtinPush)
+    , ("puts", builtinPuts)
     ]
 
 
 builtinLen :: BuiltinFunction
 builtinLen args =
-  case args of
-    [VString s] ->
-      Right $ VNum $ fromIntegral $ length s
+  return $
+    case args of
+      [VString s] ->
+        Right $ VNum $ fromIntegral $ length s
 
-    [VArray a] ->
-      Right $ VNum $ fromIntegral $ length a
+      [VArray a] ->
+        Right $ VNum $ fromIntegral $ length a
 
-    [arg] ->
-      Left $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
+      [arg] ->
+        Left $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
 
-    _ ->
-      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+      _ ->
+        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinFirst :: BuiltinFunction
 builtinFirst args =
-  case args of
-    [VArray []] ->
-      Right VNull
+  return $
+    case args of
+      [VArray []] ->
+        Right VNull
 
-    [VArray (x:_)] ->
-      Right x
+      [VArray (x:_)] ->
+        Right x
 
-    [arg] ->
-      Left $ BuiltinError $ "argument to `first` must be ARRAY, got " ++ typeOf arg
+      [arg] ->
+        Left $ BuiltinError $ "argument to `first` must be ARRAY, got " ++ typeOf arg
 
-    _ ->
-      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+      _ ->
+        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinLast :: BuiltinFunction
 builtinLast args =
-  case args of
-    [VArray []] ->
-      Right VNull
+  return $
+    case args of
+      [VArray []] ->
+        Right VNull
 
-    [VArray arr] ->
-      Right $ last arr
+      [VArray arr] ->
+        Right $ last arr
 
-    [arg] ->
-      Left $ BuiltinError $ "argument to `last` must be ARRAY, got " ++ typeOf arg
+      [arg] ->
+        Left $ BuiltinError $ "argument to `last` must be ARRAY, got " ++ typeOf arg
 
-    _ ->
-      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+      _ ->
+        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinRest :: BuiltinFunction
 builtinRest args =
-  case args of
-    [VArray []] ->
-      Right VNull
+  return $
+    case args of
+      [VArray []] ->
+        Right VNull
 
-    [VArray (_:rest)] ->
-      Right $ VArray rest
+      [VArray (_:rest)] ->
+        Right $ VArray rest
 
-    [arg] ->
-      Left $ BuiltinError $ "argument to `rest` must be ARRAY, got " ++ typeOf arg
+      [arg] ->
+        Left $ BuiltinError $ "argument to `rest` must be ARRAY, got " ++ typeOf arg
 
-    _ ->
-      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+      _ ->
+        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinPush :: BuiltinFunction
 builtinPush args =
+  return $
+    case args of
+      [VArray arr, val] ->
+        Right $ VArray $ arr ++ [val]
+
+      [subject, _] ->
+        Left $ BuiltinError $ "argument to `push` must be ARRAY, got " ++ typeOf subject
+
+      _ ->
+        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=2"
+
+
+builtinPuts :: BuiltinFunction
+builtinPuts args =
   case args of
-    [VArray arr, val] ->
-      Right $ VArray $ arr ++ [val]
+    [] ->
+      return $ Right VNull
 
-    [subject, _] ->
-      Left $ BuiltinError $ "argument to `push` must be ARRAY, got " ++ typeOf subject
-
-    _ ->
-      Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=2"
+    (arg:rest) ->
+      print arg >> builtinPuts rest
