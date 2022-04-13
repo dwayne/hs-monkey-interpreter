@@ -256,6 +256,17 @@ spec = do
         )
       ]
 
+    makeBadExamples
+      [ ( "let f = fn (x) { x }; \
+          \f()                   "
+        , ArgumentError "wrong number of arguments. got=0, want=1"
+        )
+      , ( "let f = fn (x) { x }; \
+          \f(1, 2)               "
+        , ArgumentError "wrong number of arguments. got=2, want=1"
+        )
+      ]
+
   describe "recursion" $ do
     makeGoodExamples
       [ ( "let factorial = fn(n) { if (n == 0) { 1 } else { n * factorial(n - 1) } }; \

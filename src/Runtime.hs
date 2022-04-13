@@ -33,6 +33,7 @@ data Error
   | UnknownOperator String
   | IdentifierNotFound String
   | NotAFunction String
+  | ArgumentError String
   | BuiltinError String
   deriving (Eq, Show)
 

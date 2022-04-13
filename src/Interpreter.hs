@@ -374,15 +374,20 @@ performNotEqual _ _ = Right $ VBool True
 
 
 callFunction :: Value -> [Value] -> IO (Either Runtime.Error Value)
-callFunction (VFunction params body env) args = do
-  extendedEnv <- Env.extend (zip params args) env
-  (_, eitherVal) <- runBlock body extendedEnv
-  case eitherVal of
-    Right val ->
-      return $ Right $ returned val
+callFunction (VFunction params body env) args
+  | numArgs == numParams = do
+    extendedEnv <- Env.extend (zip params args) env
+    (_, eitherVal) <- runBlock body extendedEnv
+    case eitherVal of
+      Right val ->
+        return $ Right $ returned val
 
-    err ->
-      return err
+      err ->
+        return err
+  | otherwise = return $ Left $ ArgumentError $ "wrong number of arguments. got=" ++ show numArgs ++ ", want=" ++ show numParams
+  where
+    numParams = length params
+    numArgs = length args
 
 callFunction (VBuiltinFunction builtin) args = builtin args
 
