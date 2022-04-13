@@ -4,7 +4,6 @@ module Main (main) where
 import qualified Environment as Env
 import qualified Interpreter as I
 
-import Control.Monad (void)
 import Data.Maybe (fromMaybe)
 import System.Environment (lookupEnv)
 import System.IO (hFlush, stdout)
@@ -46,6 +45,6 @@ loop env = do
       loop env'
 
     Left err -> do
-      -- TODO: Display an appropriate error message.
+      -- TODO: Display better error messages.
       print err
       loop env

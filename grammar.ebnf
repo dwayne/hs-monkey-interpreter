@@ -1,3 +1,9 @@
+/* A context-free grammar for the monkey programming language.
+ *
+ * Go to https://www.bottlecaps.de/rr/ui to view a syntax diagram of the
+ * grammar.
+ */
+
 Program ::= Stmt*
 
 Stmt     ::= ( Let | Return | ExprStmt )
