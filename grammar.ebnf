@@ -6,33 +6,44 @@
 
 Program ::= Stmt*
 
-Stmt     ::= ( Let | Return | ExprStmt )
+Stmt     ::= Let | Return | ExprStmt
 Let      ::= 'let' Id '=' Expr ';'
 Return   ::= 'return' Expr ';'
 ExprStmt ::= Expr ';'?
 
 Expr       ::= Equality
-Equality   ::= Comparison ( ( '==' | '!=' ) Comparison )*
-Comparison ::= Term ( ( '<' | '>' ) Term )*
-Term       ::= Factor ( ( '+' | '-' ) Factor )*
-Factor     ::= Unary ( ( '*' | '/' ) Unary )*
+Equality   ::= Comparison ( '==' | '!=' ) Comparison | Comparison
+Comparison ::= Term ( '<' | '>' ) Term | Term
+Term       ::= Term ( '+' | '-' ) Factor | Factor
+Factor     ::= Factor ( '*' | '/' ) Unary | Unary
 Unary      ::= ( '!' | '-' ) Unary | Operator
-Operator   ::= Primary ( '(' Args? ')' | '[' Expr ']' )*
-Primary    ::= Id | Number | String | Array | Hash | 'true' | 'false'
-             | 'if' '(' Expr ')' Block ( 'else' Block )?
-             | 'fn' '(' Params? ')' Block
+Operator   ::= Operator ( Args | Index ) | Primary
+Primary    ::= Identifier
+             | Number
+             | Boolean
+             | String
+             | Array
+             | Hash
+             | If
+             | Function
              | '(' Expr ')'
+
+Identifier ::= [a-zA-Z_]+
+Number     ::= [0-9]+
+Boolean    ::= 'true' | 'false'
 String     ::= '"' [^"]* '"'
-Array      ::= '[' ExprList? ']'
-Hash       ::= '{' KeyValueList? '}'
+Array      ::= '[' ']' | '[' ExprList ']'
+Hash       ::= '{' '}' | '{' KeyValueList '}'
+If         ::= 'if' '(' Expr ')' Block ( 'else' Block )?
+Function   ::= 'fn' Params Block
 
-Block    ::= '{' Stmt+ '}'
-Params   ::= Id ( ',' Id )*
-Args     ::= ExprList
-ExprList ::= Expr ( ',' Expr )*
-
-KeyValueList ::= KeyValue ( ',' KeyValue )*
+Args         ::= '(' ')' | '(' ArgList ')'
+ArgList      ::= ArgList ',' Expr | Expr
+Index        ::= '[' Expr ']'
+ExprList     ::= ExprList ',' Expr | Expr
+KeyValueList ::= KeyValueList ',' KeyValue | KeyValue
 KeyValue     ::= Expr ':' Expr
-
-Id     ::= [a-zA-Z_]+
-Number ::= [0-9]+
+Block        ::= '{' Stmts '}'
+Stmts        ::= Stmts Stmt | Stmt
+Params       ::= '(' ')' | '(' ParamList ')'
+ParamList    ::= ParamList ',' Id | Id
