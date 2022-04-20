@@ -1,24 +1,23 @@
 module Lexer
-  ( identifier
-  , integer
-  , string
-  , reserved
-  , symbol
-  , whiteSpace
-  , parens
-  , braces
-  , brackets
-  , semicolon
+  ( identifier, number, boolean, string
+
+  , rElse, rFn, rIf, rLet, rReturn
+
+  , asterisk, bang, bangEqual, colon, doubleEqual, equal, greaterThan
+  , hyphen, lessThan, plus, semicolon, slash
+
   , commaSep
-  )
-  where
+  , braces, brackets, parens
+  , whiteSpace
+  ) where
 
 
 import qualified Data.Char as Char
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as T
 
-import Control.Monad (mzero)
+import Control.Monad (mzero, void)
+import Text.Parsec ((<|>))
 import Text.Parsec.Language (LanguageDef, emptyDef)
 import Text.Parsec.String (Parser)
 import Text.Parsec.Token (TokenParser, makeTokenParser)
@@ -28,8 +27,15 @@ identifier :: Parser String
 identifier = T.identifier monkey
 
 
-integer :: Parser Integer
-integer = T.lexeme monkey (read <$> P.many1 P.digit)
+number :: Parser Integer
+number = T.lexeme monkey (read <$> P.many1 P.digit)
+
+
+boolean :: Parser Bool
+boolean = true <|> false
+  where
+    true = True <$ reserved "true"
+    false = False <$ reserved "false"
 
 
 string :: Parser String
@@ -39,20 +45,85 @@ string = T.lexeme monkey (P.between quote quote (P.many stringChar))
     stringChar = P.satisfy (\c -> c /= '"' && Char.isAscii c)
 
 
-reserved :: String -> Parser ()
-reserved = T.reserved monkey
+-- RESERVED NAMES
 
 
-symbol :: String -> Parser String
-symbol = T.symbol monkey
+rElse :: Parser ()
+rElse = reserved "else"
 
 
-whiteSpace :: Parser ()
-whiteSpace = T.whiteSpace monkey
+rFn :: Parser ()
+rFn = reserved "fn"
 
 
-parens :: Parser a -> Parser a
-parens = T.parens monkey
+rIf :: Parser ()
+rIf = reserved "if"
+
+
+rLet :: Parser ()
+rLet = reserved "let"
+
+
+rReturn :: Parser ()
+rReturn = reserved "return"
+
+
+-- SYMBOLS
+
+
+asterisk :: Parser ()
+asterisk = symbol "*"
+
+
+bang :: Parser ()
+bang = symbol "!"
+
+
+bangEqual :: Parser ()
+bangEqual = symbol "!="
+
+
+colon :: Parser ()
+colon = symbol ":"
+
+
+doubleEqual :: Parser ()
+doubleEqual = symbol "=="
+
+
+equal :: Parser ()
+equal = symbol "="
+
+
+greaterThan :: Parser ()
+greaterThan = symbol ">"
+
+
+hyphen :: Parser ()
+hyphen = symbol "-"
+
+
+lessThan :: Parser ()
+lessThan = symbol "<"
+
+
+plus :: Parser ()
+plus = symbol "+"
+
+
+semicolon :: Parser ()
+semicolon = symbol ";"
+
+
+slash :: Parser ()
+slash = symbol "/"
+
+
+-- MISC
+
+
+commaSep :: Parser a -> Parser [a]
+commaSep = T.commaSep monkey
 
 
 braces :: Parser a -> Parser a
@@ -63,12 +134,23 @@ brackets :: Parser a -> Parser a
 brackets = T.brackets monkey
 
 
-semicolon :: Parser String
-semicolon = T.semi monkey
+parens :: Parser a -> Parser a
+parens = T.parens monkey
 
 
-commaSep :: Parser a -> Parser [a]
-commaSep = T.commaSep monkey
+whiteSpace :: Parser ()
+whiteSpace = T.whiteSpace monkey
+
+
+reserved :: String -> Parser ()
+reserved = T.reserved monkey
+
+
+symbol :: String -> Parser ()
+symbol = void . T.symbol monkey
+
+
+-- TOKEN PARSER
 
 
 monkey :: TokenParser ()
@@ -80,8 +162,6 @@ monkeyDef =
   emptyDef
     { T.identStart = letter
     , T.identLetter = letter
-    , T.opStart = mzero
-    , T.opLetter = mzero
     , T.reservedNames =
         [ "else"
         , "false"
@@ -91,6 +171,8 @@ monkeyDef =
         , "return"
         , "true"
         ]
+    , T.opStart = mzero
+    , T.opLetter = mzero
     }
 
 

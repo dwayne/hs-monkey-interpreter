@@ -1,16 +1,14 @@
 module Parser
   ( Program(..), Stmt(..), Expr(..), Id, Block
   , parse
-
-  -- re-export from Text.Parsec for convenience
   , ParseError
   )
   where
 
 
-import qualified Lexer
 import qualified Text.Parsec as P
 
+import Lexer
 import Text.Parsec ((<|>), ParseError)
 import Text.Parsec.String (Parser)
 
@@ -57,9 +55,11 @@ parse = P.parse program ""
 
 
 program :: Parser Program
-program = Program <$> (Lexer.whiteSpace *> stmts <* P.eof)
-  where
-    stmts = P.many stmt
+program = Program <$> (whiteSpace *> stmts <* P.eof)
+
+
+stmts :: Parser [Stmt]
+stmts = P.many stmt
 
 
 stmt :: Parser Stmt
@@ -70,22 +70,15 @@ stmt =
 
 
 letStmt :: Parser Stmt
-letStmt = Let <$ letToken <*> Lexer.identifier <*> (equal *> expr <* Lexer.semicolon)
-  where
-    letToken = Lexer.reserved "let"
-    equal = Lexer.symbol "="
+letStmt = Let <$ rLet <*> identifier <*> (equal *> expr <* semicolon)
 
 
 returnStmt :: Parser Stmt
-returnStmt = Return <$> (returnToken *> expr <* Lexer.semicolon)
-  where
-    returnToken = Lexer.reserved "return"
+returnStmt = Return <$> (rReturn *> expr <* semicolon)
 
 
 exprStmt :: Parser Stmt
-exprStmt = ExprStmt <$> expr <* optionalSemicolon
-  where
-    optionalSemicolon = P.optional Lexer.semicolon
+exprStmt = ExprStmt <$> expr <* P.optional semicolon
 
 
 expr :: Parser Expr
@@ -93,53 +86,48 @@ expr = equality
 
 
 equality :: Parser Expr
-equality = comparison `P.chainl1` equalityOp
+equality = comparison `P.chainl1` (eq <|> notEq)
   where
-    equalityOp = equal <|> notEqual
-    equal = Equal <$ Lexer.symbol "=="
-    notEqual = NotEqual <$ Lexer.symbol "!="
+    eq = Equal <$ doubleEqual
+    notEq = NotEqual <$ bangEqual
 
 
 comparison :: Parser Expr
-comparison = term `P.chainl1` comparisonOp
+comparison = term `P.chainl1` (lt <|> gt)
   where
-    comparisonOp = lessThan <|> greaterThan
-    lessThan = LessThan <$ Lexer.symbol "<"
-    greaterThan = GreaterThan <$ Lexer.symbol ">"
+    lt = LessThan <$ lessThan
+    gt = GreaterThan <$ greaterThan
 
 
 term :: Parser Expr
-term = factor `P.chainl1` termOp
+term = factor `P.chainl1` (add <|> sub)
   where
-    termOp = add <|> sub
-    add = Add <$ Lexer.symbol "+"
-    sub = Sub <$ Lexer.symbol "-"
+    add = Add <$ plus
+    sub = Sub <$ hyphen
 
 
 factor :: Parser Expr
-factor = unary `P.chainl1` factorOp
+factor = unary `P.chainl1` (mul <|> divide)
   where
-    factorOp = mul <|> divOp
-    mul = Mul <$ Lexer.symbol "*"
-    divOp = Div <$ Lexer.symbol "/"
+    mul = Mul <$ asterisk
+    divide = Div <$ slash
 
 
 unary :: Parser Expr
-unary = unaryOp <*> unary <|> operator
+unary = (notOp <|> negateOp) <*> unary <|> operator
   where
-    unaryOp = notOp <|> negateOp
-    notOp = Not <$ Lexer.symbol "!"
-    negateOp = Negate <$ Lexer.symbol "-"
+    notOp = Not <$ bang
+    negateOp = Negate <$ hyphen
 
 
 operator :: Parser Expr
 operator = foldl (flip ($)) <$> primary <*> (P.many (args <|> index))
   where
     args :: Parser (Expr -> Expr)
-    args = flip Call <$> (Lexer.parens $ Lexer.commaSep expr)
+    args = flip Call <$> (parens $ commaSep expr)
 
     index :: Parser (Expr -> Expr)
-    index = flip Index <$> (Lexer.brackets expr)
+    index = flip Index <$> (brackets expr)
 
 
 primary :: Parser Expr
@@ -147,69 +135,61 @@ primary =
   ifExpr
   <|> function
   <|> bool
-  <|> variable
-  <|> constant
-  <|> string
+  <|> var
+  <|> num
+  <|> str
   <|> array
   <|> hash
   <|> group
 
 
-variable :: Parser Expr
-variable = Var <$> Lexer.identifier
+ifExpr :: Parser Expr
+ifExpr = If <$ rIf <*> condition <*> thenBlock <*> maybeElseBlock
+  where
+    condition = parens expr
+    thenBlock = block
+    maybeElseBlock = P.optionMaybe (rElse *> block)
 
 
-constant :: Parser Expr
-constant = Num <$> Lexer.integer
+function :: Parser Expr
+function = Function <$ rFn <*> params <*> body
+  where
+    params = parens $ commaSep identifier
+    body = block
 
 
-string :: Parser Expr
-string = String <$> Lexer.string
+block :: Parser Block
+block = braces stmts
+
+
+bool :: Parser Expr
+bool = Bool <$> boolean
+
+
+var :: Parser Expr
+var = Var <$> identifier
+
+
+num :: Parser Expr
+num = Num <$> number
+
+
+str :: Parser Expr
+str = String <$> string
 
 
 array :: Parser Expr
 array = Array <$> exprList
   where
-    exprList = Lexer.brackets $ Lexer.commaSep expr
+    exprList = brackets $ commaSep expr
 
 
 hash :: Parser Expr
 hash = Hash <$> keyValueList
   where
-    keyValueList = Lexer.braces $ Lexer.commaSep keyValue
+    keyValueList = braces $ commaSep keyValue
     keyValue = (,) <$> expr <* colon <*> expr
-    colon = Lexer.symbol ":"
-
-
-bool :: Parser Expr
-bool = Bool <$> trueOrFalse
-  where
-    trueOrFalse = true <|> false
-    true = const True <$> Lexer.reserved "true"
-    false = const False <$> Lexer.reserved "false"
-
-
-ifExpr :: Parser Expr
-ifExpr = If <$ ifToken <*> condition <*> thenBlock <*> maybeElseBlock
-  where
-    ifToken = Lexer.reserved "if"
-    condition = Lexer.parens expr
-    thenBlock = block
-    maybeElseBlock = P.optionMaybe (elseToken *> block)
-    elseToken = Lexer.reserved "else"
-
-
-function :: Parser Expr
-function = Function <$ fn <*> params <*> body
-  where
-    fn = Lexer.reserved "fn"
-    params = Lexer.parens $ Lexer.commaSep Lexer.identifier
-    body = block
 
 
 group :: Parser Expr
-group = Lexer.parens expr
-
-
-block :: Parser Block
-block = Lexer.braces $ P.many stmt
+group = parens expr
