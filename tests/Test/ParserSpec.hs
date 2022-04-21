@@ -118,7 +118,7 @@ spec = do
     it "example 14" $ do
       let input = "x == y"
       let program = Program
-                      [ ExprStmt $ Equal (Var "x") (Var "y")
+                      [ ExprStmt $ Infix Equal (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -126,7 +126,7 @@ spec = do
     it "example 15" $ do
       let input = "x != y"
       let program = Program
-                      [ ExprStmt $ NotEqual (Var "x") (Var "y")
+                      [ ExprStmt $ Infix NotEqual (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -134,7 +134,7 @@ spec = do
     it "example 16" $ do
       let input = "x < y"
       let program = Program
-                      [ ExprStmt $ LessThan (Var "x") (Var "y")
+                      [ ExprStmt $ Infix LessThan (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -142,7 +142,7 @@ spec = do
     it "example 17" $ do
       let input = "x > y"
       let program = Program
-                      [ ExprStmt $ GreaterThan (Var "x") (Var "y")
+                      [ ExprStmt $ Infix GreaterThan (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -150,7 +150,7 @@ spec = do
     it "example 18" $ do
       let input = "x + y"
       let program = Program
-                      [ ExprStmt $ Add (Var "x") (Var "y")
+                      [ ExprStmt $ Infix Add (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -158,7 +158,7 @@ spec = do
     it "example 19" $ do
       let input = "x - y"
       let program = Program
-                      [ ExprStmt $ Sub (Var "x") (Var "y")
+                      [ ExprStmt $ Infix Sub (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -166,7 +166,7 @@ spec = do
     it "example 20" $ do
       let input = "x * y"
       let program = Program
-                      [ ExprStmt $ Mul (Var "x") (Var "y")
+                      [ ExprStmt $ Infix Mul (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -174,7 +174,7 @@ spec = do
     it "example 21" $ do
       let input = "x / y"
       let program = Program
-                      [ ExprStmt $ Div (Var "x") (Var "y")
+                      [ ExprStmt $ Infix Div (Var "x") (Var "y")
                       ]
 
       parse input `shouldBe` Right program
@@ -182,7 +182,7 @@ spec = do
     it "example 22" $ do
       let input = "!x"
       let program = Program
-                      [ ExprStmt $ Not (Var "x")
+                      [ ExprStmt $ Prefix Not (Var "x")
                       ]
 
       parse input `shouldBe` Right program
@@ -190,7 +190,7 @@ spec = do
     it "example 23" $ do
       let input = "-x"
       let program = Program
-                      [ ExprStmt $ Negate (Var "x")
+                      [ ExprStmt $ Prefix Negate (Var "x")
                       ]
 
       parse input `shouldBe` Right program
@@ -198,7 +198,7 @@ spec = do
     it "example 24" $ do
       let input = "1 + 2 * 3 < -4 * 4 / 2"
       let program = Program
-                      [ ExprStmt $ LessThan (Add (Num 1) (Mul (Num 2) (Num 3))) (Div (Mul (Negate (Num 4)) (Num 4)) (Num 2))
+                      [ ExprStmt $ Infix LessThan (Infix Add (Num 1) (Infix Mul (Num 2) (Num 3))) (Infix Div (Infix Mul (Prefix Negate (Num 4)) (Num 4)) (Num 2))
                       ]
 
       parse input `shouldBe` Right program
@@ -206,7 +206,7 @@ spec = do
     it "example 25" $ do
       let input = "!(-5 > 3)"
       let program = Program
-                      [ ExprStmt $ Not (GreaterThan (Negate (Num 5)) (Num 3))
+                      [ ExprStmt $ Prefix Not (Infix GreaterThan (Prefix Negate (Num 5)) (Num 3))
                       ]
 
       parse input `shouldBe` Right program
@@ -214,7 +214,7 @@ spec = do
     it "example 26" $ do
       let input = "(1 + 2) * 3"
       let program = Program
-                      [ ExprStmt $ Mul (Add (Num 1) (Num 2)) (Num 3)
+                      [ ExprStmt $ Infix Mul (Infix Add (Num 1) (Num 2)) (Num 3)
                       ]
 
       parse input `shouldBe` Right program
@@ -291,7 +291,7 @@ spec = do
                             [ String "Thorsten"
                             , String "Ball"
                             , Num 28
-                            , Function ["x"] [ ExprStmt $ Mul (Var "x") (Var "x") ]
+                            , Function ["x"] [ ExprStmt $ Infix Mul (Var "x") (Var "x") ]
                             ]
                       ]
 
@@ -300,7 +300,7 @@ spec = do
     it "example 36" $ do
       let input = "myArray[1 + 1]"
       let program = Program
-                      [ ExprStmt $ Index (Var "myArray") (Add (Num 1) (Num 1))
+                      [ ExprStmt $ Index (Var "myArray") (Infix Add (Num 1) (Num 1))
                       ]
 
       parse input `shouldBe` Right program
@@ -309,8 +309,8 @@ spec = do
       let input = "a * [1, 2, 3, 4][b * c] * d"
       let program = Program
                       [ ExprStmt $
-                          Mul
-                            (Mul (Var "a") (Index (Array [Num 1, Num 2, Num 3, Num 4]) (Mul (Var "b") (Var "c"))))
+                          Infix Mul
+                            (Infix Mul (Var "a") (Index (Array [Num 1, Num 2, Num 3, Num 4]) (Infix Mul (Var "b") (Var "c"))))
                             (Var "d")
                       ]
 
@@ -322,9 +322,9 @@ spec = do
                       [ ExprStmt $
                           Call
                             (Var "add")
-                            [ Mul (Var "a") (Index (Var "b") (Num 2))
+                            [ Infix Mul (Var "a") (Index (Var "b") (Num 2))
                             , Index (Var "b") (Num 1)
-                            , Mul (Num 2) (Index (Array [Num 1, Num 2]) (Num 1))
+                            , Infix Mul (Num 2) (Index (Array [Num 1, Num 2]) (Num 1))
                             ]
                       ]
 
@@ -399,9 +399,9 @@ spec = do
       let input = "{\"one\": 0 + 1, \"two\": 10 - 8, \"three\": 15 / 5}"
       let program = Program
                       [ ExprStmt $ Hash
-                          [ (String "one", Add (Num 0) (Num 1))
-                          , (String "two", Sub (Num 10) (Num 8))
-                          , (String "three", Div (Num 15) (Num 5))
+                          [ (String "one", Infix Add (Num 0) (Num 1))
+                          , (String "two", Infix Sub (Num 10) (Num 8))
+                          , (String "three", Infix Div (Num 15) (Num 5))
                           ]
                       ]
 
@@ -419,7 +419,7 @@ spec = do
                       [ Let "x" (Num 5)
                       , Let "y" (Num 10)
                       , Let "foobar" (Call (Var "add") [Num 5, Num 5])
-                      , Let "barfoo" (Add (Sub (Add (Div (Mul (Num 5) (Num 5)) (Num 10)) (Num 18)) (Call (Var "add") [Num 5, Num 5])) (Call (Var "multiply") [Num 124]))
+                      , Let "barfoo" (Infix Add (Infix Sub (Infix Add (Infix Div (Infix Mul (Num 5) (Num 5)) (Num 10)) (Num 18)) (Call (Var "add") [Num 5, Num 5])) (Call (Var "multiply") [Num 124]))
                       , Let "anotherName" (Var "barfoo")
                       ]
 
@@ -435,7 +435,7 @@ spec = do
       let program = Program
                       [ Let "x" (Num 10)
                       , Let "y" (Num 15)
-                      , Let "add" (Function ["a", "b"] [Return (Add (Var "a") (Var "b"))])
+                      , Let "add" (Function ["a", "b"] [Return (Infix Add (Var "a") (Var "b"))])
                       ]
 
       parse input `shouldBe` Right program
@@ -462,10 +462,10 @@ spec = do
       -- NOTICE: I had to add a semicolon to make it parse correctly.
       -- Otherwise, it would be interpreted as 5 * (5 + 10) - 5 - 10.
       let program = Program
-                      [ ExprStmt $ Add (Mul (Num 5) (Num 5)) (Num 10)
-                      , ExprStmt $ Mul (Num 5) (Add (Num 5) (Num 10))
-                      , ExprStmt $ Sub (Negate (Num 5)) (Num 10)
-                      , ExprStmt $ Mul (Num 5) (Add (Call (Var "add") [Num 2, Num 3]) (Num 10))
+                      [ ExprStmt $ Infix Add (Infix Mul (Num 5) (Num 5)) (Num 10)
+                      , ExprStmt $ Infix Mul (Num 5) (Infix Add (Num 5) (Num 10))
+                      , ExprStmt $ Infix Sub (Prefix Negate (Num 5)) (Num 10)
+                      , ExprStmt $ Infix Mul (Num 5) (Infix Add (Call (Var "add") [Num 2, Num 3]) (Num 10))
                       ]
 
       parse input `shouldBe` Right program

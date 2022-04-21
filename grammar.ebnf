@@ -17,7 +17,7 @@ Comparison ::= Term ( '<' | '>' ) Term | Term
 Term       ::= Term ( '+' | '-' ) Factor | Factor
 Factor     ::= Factor ( '*' | '/' ) Unary | Unary
 Unary      ::= ( '!' | '-' ) Unary | Operator
-Operator   ::= Operator ( Args | Index ) | Primary
+Operator   ::= Operator ( Call | Index ) | Primary
 Primary    ::= Identifier
              | Number
              | Boolean
@@ -37,8 +37,7 @@ Hash       ::= '{' '}' | '{' KeyValueList '}'
 If         ::= 'if' '(' Expr ')' Block ( 'else' Block )?
 Function   ::= 'fn' Params Block
 
-Args         ::= '(' ')' | '(' ArgList ')'
-ArgList      ::= ArgList ',' Expr | Expr
+Call         ::= '(' ')' | '(' ExprList ')'
 Index        ::= '[' Expr ']'
 ExprList     ::= ExprList ',' Expr | Expr
 KeyValueList ::= KeyValueList ',' KeyValue | KeyValue

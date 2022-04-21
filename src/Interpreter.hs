@@ -123,97 +123,17 @@ runExpr expr env =
         Left err ->
           return (env, Left err)
 
-    Not a -> do
+    Infix binOp a b -> do
+      (env', eitherAVal) <- runExpr a env
+      (env'', eitherBVal) <- runExpr b env'
+
+      let result = join $ liftM2 (performBinOp binOp) eitherAVal eitherBVal
+
+      return (env'', result)
+
+    Prefix unaryOp a -> do
       (env', eitherVal) <- runExpr a env
-      return (env', eitherVal >>= performNot)
-
-    Negate a -> do
-      (env', eitherVal) <- runExpr a env
-      return (env', eitherVal >>= performNegate)
-
-    Add a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performAdd eitherAVal eitherBVal
-
-      return (env'', result)
-
-    Sub a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performSub eitherAVal eitherBVal
-
-      return (env'', result)
-
-    Mul a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performMul eitherAVal eitherBVal
-
-      return (env'', result)
-
-    Div a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performDiv eitherAVal eitherBVal
-
-      return (env'', result)
-
-    LessThan a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performLessThan eitherAVal eitherBVal
-
-      return (env'', result)
-
-    GreaterThan a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performGreaterThan eitherAVal eitherBVal
-
-      return (env'', result)
-
-    Equal a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performEqual eitherAVal eitherBVal
-
-      return (env'', result)
-
-    NotEqual a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 performNotEqual eitherAVal eitherBVal
-
-      return (env'', result)
-
-    If condition thenBlock maybeElseBlock -> do
-      (env', eitherConditionVal) <- runExpr condition env
-      case eitherConditionVal of
-        Right conditionVal ->
-          if isTruthy conditionVal then
-            runBlock thenBlock env'
-          else
-            case maybeElseBlock of
-              Nothing ->
-                return (env', Right VNull)
-
-              Just elseBlock ->
-                runBlock elseBlock env'
-
-        Left err ->
-          return (env', Left err)
-
-    Function params body ->
-      return (env, Right $ VFunction params body env)
+      return (env', eitherVal >>= performUnaryOp unaryOp)
 
     Call fExpr argExprs -> do
       (_, eitherFVal) <- runExpr fExpr env
@@ -248,6 +168,26 @@ runExpr expr env =
 
         Left err ->
           return (env, Left err)
+
+    If condition thenBlock maybeElseBlock -> do
+      (env', eitherConditionVal) <- runExpr condition env
+      case eitherConditionVal of
+        Right conditionVal ->
+          if isTruthy conditionVal then
+            runBlock thenBlock env'
+          else
+            case maybeElseBlock of
+              Nothing ->
+                return (env', Right VNull)
+
+              Just elseBlock ->
+                runBlock elseBlock env'
+
+        Left err ->
+          return (env', Left err)
+
+    Function params body ->
+      return (env, Right $ VFunction params body env)
 
 
 runExprs :: [Expr] -> Env -> IO (Either Runtime.Error [Value])
@@ -289,15 +229,47 @@ runKVExprs kvExprs env = helper kvExprs []
           return $ Left err
 
 
-performNot :: Value -> Either Runtime.Error Value
-performNot (VBool b) = Right $ VBool $ not b
-performNot VNull = Right $ VBool True
-performNot _ = Right $ VBool False
+performBinOp :: BinOp -> Value -> Value -> Either Runtime.Error Value
+performBinOp Equal       = performEqual
+performBinOp NotEqual    = performNotEqual
+performBinOp LessThan    = performLessThan
+performBinOp GreaterThan = performGreaterThan
+performBinOp Add         = performAdd
+performBinOp Sub         = performSub
+performBinOp Mul         = performMul
+performBinOp Div         = performDiv
 
 
-performNegate :: Value -> Either Runtime.Error Value
-performNegate (VNum n) = Right $ VNum $ negate n
-performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
+performEqual :: Value -> Value -> Either Runtime.Error Value
+performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
+performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
+performEqual _ _ = Right $ VBool False
+
+
+performNotEqual :: Value -> Value -> Either Runtime.Error Value
+performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
+performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
+performNotEqual _ _ = Right $ VBool True
+
+
+performLessThan :: Value -> Value -> Either Runtime.Error Value
+performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
+performLessThan aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " < " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " < " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
+
+
+performGreaterThan :: Value -> Value -> Either Runtime.Error Value
+performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
+performGreaterThan aVal bVal
+  | ta /= tb = Left $ TypeMismatch $ ta ++ " > " ++ tb
+  | otherwise = Left $ UnknownOperator $ ta ++ " > " ++ tb
+  where
+    ta = typeOf aVal
+    tb = typeOf bVal
 
 
 performAdd :: Value -> Value -> Either Runtime.Error Value
@@ -341,36 +313,20 @@ performDiv aVal bVal
     tb = typeOf bVal
 
 
-performLessThan :: Value -> Value -> Either Runtime.Error Value
-performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
-performLessThan aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " < " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " < " ++ tb
-  where
-    ta = typeOf aVal
-    tb = typeOf bVal
+performUnaryOp :: UnaryOp -> Value -> Either Runtime.Error Value
+performUnaryOp Not    = performNot
+performUnaryOp Negate = performNegate
 
 
-performGreaterThan :: Value -> Value -> Either Runtime.Error Value
-performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
-performGreaterThan aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " > " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " > " ++ tb
-  where
-    ta = typeOf aVal
-    tb = typeOf bVal
+performNot :: Value -> Either Runtime.Error Value
+performNot (VBool b) = Right $ VBool $ not b
+performNot VNull = Right $ VBool True
+performNot _ = Right $ VBool False
 
 
-performEqual :: Value -> Value -> Either Runtime.Error Value
-performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
-performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
-performEqual _ _ = Right $ VBool False
-
-
-performNotEqual :: Value -> Value -> Either Runtime.Error Value
-performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
-performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
-performNotEqual _ _ = Right $ VBool True
+performNegate :: Value -> Either Runtime.Error Value
+performNegate (VNum n) = Right $ VNum $ negate n
+performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
 
 
 callFunction :: Value -> [Value] -> IO (Either Runtime.Error Value)
