@@ -26,7 +26,7 @@ getUsername =
 
 
 start :: IO ()
-start = Env.empty >>= loop
+start = loop Env.empty
 
 
 loop :: I.Env -> IO ()

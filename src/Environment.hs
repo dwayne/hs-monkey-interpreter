@@ -1,49 +1,74 @@
 module Environment
   ( Environment
   , empty, fromList
-  , get
-  , set
-  , extend
+
+  , Result(..)
+  , lookup
+
+  , extend, extendRec, extendMany
   ) where
 
 
 import qualified Data.Map as Map
 
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Prelude hiding (lookup)
 
 
-data Environment k v
-  = Environment (IORef [Map.Map k v])
+data Environment k v e
+  = Empty
+  | Single k v (Environment k v e)
+  | SingleRec k e (Environment k v e)
+  | Multi (Map.Map k v) (Environment k v e)
 
 
-empty :: IO (Environment k v)
-empty = Environment <$> newIORef [Map.empty]
+empty :: Environment k v e
+empty = Empty
 
 
-fromList :: Ord k => [(k, v)] -> IO (Environment k v)
-fromList bindings = Environment <$> newIORef [Map.fromList bindings]
+fromList :: Ord k => [(k, v)] -> Environment k v e
+fromList bindings = Multi (Map.fromList bindings) Empty
 
 
-get :: Ord k => k -> Environment k v -> IO (Maybe v)
-get k (Environment mapsRef) = helper <$> readIORef mapsRef
-  where
-    helper [] = Nothing
-    helper (m:ms) =
-      case Map.lookup k m of
+data Result k v e
+  = NotFound
+  | Value v
+  | Thunk e (Environment k v e)
+
+
+lookup :: Ord k => k -> Environment k v e -> Result k v e
+lookup searchKey env =
+  case env of
+    Empty ->
+      NotFound
+
+    Single k v nextEnv ->
+      if searchKey == k then
+        Value v
+      else
+        lookup searchKey nextEnv
+
+    SingleRec k e nextEnv ->
+      if searchKey == k then
+        Thunk e env
+      else
+        lookup searchKey nextEnv
+
+    Multi bindings nextEnv ->
+      case Map.lookup searchKey bindings of
         Nothing ->
-          helper ms
+          lookup searchKey nextEnv
 
-        success ->
-          success
-
-
-set :: Ord k => k -> v -> Environment k v -> IO ()
-set k v (Environment mapsRef) = do
-  (m:ms) <- readIORef mapsRef
-  writeIORef mapsRef $ Map.insert k v m : ms
+        Just v ->
+          Value v
 
 
-extend :: Ord k => [(k, v)] -> Environment k v -> IO (Environment k v)
-extend bindings (Environment mapsRef) = do
-  maps <- readIORef mapsRef
-  Environment <$> newIORef (Map.fromList bindings : maps)
+extend :: k -> v -> Environment k v e -> Environment k v e
+extend k v env = Single k v env
+
+
+extendRec :: k -> e -> Environment k v e -> Environment k v e
+extendRec k e env = SingleRec k e env
+
+
+extendMany :: Ord k => [(k, v)] -> Environment k v e -> Environment k v e
+extendMany bindings env = Multi (Map.fromList bindings) env

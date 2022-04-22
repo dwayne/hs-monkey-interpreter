@@ -23,7 +23,7 @@ data Value
   | VFunction [Id] Block Env
   | VBuiltinFunction BuiltinFunction
 
-type Env = Environment Id Value
+type Env = Environment Id Value Expr
 type Hash = Hash.Hash Value
 
 type BuiltinFunction = [Value] -> IO (Either Error Value)
@@ -118,7 +118,7 @@ typeOf (VBuiltinFunction _) = "BUILTIN"
 
 builtins :: IO Env
 builtins =
-  Env.fromList $ map (fmap VBuiltinFunction)
+  return $ Env.fromList $ map (fmap VBuiltinFunction)
     [ ("len", builtinLen)
     , ("first", builtinFirst)
     , ("last", builtinLast)

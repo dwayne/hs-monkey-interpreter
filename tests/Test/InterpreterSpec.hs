@@ -219,7 +219,7 @@ spec = do
 
   describe "function definitions" $ do
     it "example 1" $ do
-      Right val <- snd <$> (run "fn(x) { x + 2; };" =<< Env.empty)
+      Right val <- snd <$> (run "fn(x) { x + 2; };" Env.empty)
 
       -- just a sanity check
       show val `shouldBe` "<function>"
@@ -587,7 +587,7 @@ makeExamples examples =
 
     makeExample (n, (input, expectedOutput)) =
       it ("example " ++ show n) $
-        (snd <$> (run input =<< Env.empty)) `shouldReturn` expectedOutput
+        (snd <$> (run input Env.empty)) `shouldReturn` expectedOutput
 
     specs = map makeExample numberedExamples
   in

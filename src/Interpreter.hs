@@ -57,16 +57,8 @@ runBlock (stmt : rest) env = do
 runStmt :: Stmt -> Env -> IO (Env, Either Runtime.Error Value)
 runStmt stmt env =
   case stmt of
-    Let identifier expr -> do
-      (env', eitherVal) <- runExpr expr env
-
-      case eitherVal of
-        Right val -> do
-          Env.set identifier val env'
-          return (env', Right VNull)
-
-        Left err ->
-          return (env, Left err)
+    Let identifier expr ->
+      return (Env.extendRec identifier expr env, Right VNull)
 
     Return expr ->
       fmap (fmap (fmap VReturn)) $ runExpr expr env
@@ -78,21 +70,27 @@ runStmt stmt env =
 runExpr :: Expr -> Env -> IO (Env, Either Runtime.Error Value)
 runExpr expr env =
   case expr of
-    Var identifier -> do
-      maybeVal <- Env.get identifier env
-      case maybeVal of
-        Just val ->
-          return (env, Right val)
-
-        Nothing -> do
+    Var identifier ->
+      case Env.lookup identifier env of
+        Env.NotFound -> do
           builtinsEnv <- builtins
-          maybeBuiltin <- Env.get identifier builtinsEnv
-          case maybeBuiltin of
-            Just val ->
+          case Env.lookup identifier builtinsEnv of
+            Env.NotFound ->
+              return (env, Left $ IdentifierNotFound identifier)
+
+            Env.Value val ->
               return (env, Right val)
 
-            Nothing ->
-              return (env, Left $ IdentifierNotFound identifier)
+            Env.Thunk aExpr aEnv -> do
+              (_, eitherAVal) <- runExpr aExpr aEnv
+              return (env, eitherAVal)
+
+        Env.Value val ->
+          return (env, Right val)
+
+        Env.Thunk aExpr aEnv -> do
+          (_, eitherAVal) <- runExpr aExpr aEnv
+          return (env, eitherAVal)
 
     Num n ->
       return (env, Right $ VNum n)
@@ -332,7 +330,7 @@ performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
 callFunction :: Value -> [Value] -> IO (Either Runtime.Error Value)
 callFunction (VFunction params body env) args
   | numArgs == numParams = do
-    extendedEnv <- Env.extend (zip params args) env
+    let extendedEnv = Env.extendMany (zip params args) env
     (_, eitherVal) <- runBlock body extendedEnv
     case eitherVal of
       Right val ->
