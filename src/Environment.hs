@@ -32,7 +32,7 @@ fromList bindings = Multi (Map.fromList bindings) Empty
 data Result k v e
   = NotFound
   | Value v
-  | Thunk e (Environment k v e)
+  | Expr e
 
 
 lookup :: Ord k => k -> Environment k v e -> Result k v e
@@ -49,7 +49,7 @@ lookup searchKey env =
 
     SingleRec k e nextEnv ->
       if searchKey == k then
-        Thunk e env
+        Expr e
       else
         lookup searchKey nextEnv
 

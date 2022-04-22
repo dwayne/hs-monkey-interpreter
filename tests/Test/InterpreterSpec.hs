@@ -211,10 +211,32 @@ spec = do
           \d * c * a;                              "
         , VNum 245025
         )
+
+      -- mutual recursion
+      , ( "let even = fn (n) { \
+          \  if (n == 0) {     \
+          \    true            \
+          \  } else {          \
+          \    odd(n - 1)      \
+          \  }                 \
+          \};                  \
+          \                    \
+          \let odd = fn (n) {  \
+          \  if (n == 0) {     \
+          \    false           \
+          \  } else {          \
+          \    even(n - 1)     \
+          \  }                 \
+          \};                  \
+          \                    \
+          \even(2)             "
+        , VBool True
+        )
       ]
 
     makeBadExamples
-      [ ("foobar", IdentifierNotFound "foobar")
+      [ ("let a = a; a", IdentifierNotFound "a")
+      , ("foobar", IdentifierNotFound "foobar")
       ]
 
   describe "function definitions" $ do

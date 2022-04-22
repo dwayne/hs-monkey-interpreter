@@ -58,7 +58,18 @@ runStmt :: Stmt -> Env -> IO (Env, Either Runtime.Error Value)
 runStmt stmt env =
   case stmt of
     Let identifier expr ->
-      return (Env.extendRec identifier expr env, Right VNull)
+      case expr of
+        Function _ _ ->
+          return (Env.extendRec identifier expr env, Right VNull)
+
+        _ -> do
+          (env', eitherVal) <- runExpr expr env
+          case eitherVal of
+            Right val ->
+              return (Env.extend identifier val env', Right VNull)
+
+            Left err ->
+              return (env, Left err)
 
     Return expr ->
       fmap (fmap (fmap VReturn)) $ runExpr expr env
@@ -81,16 +92,14 @@ runExpr expr env =
             Env.Value val ->
               return (env, Right val)
 
-            Env.Thunk aExpr aEnv -> do
-              (_, eitherAVal) <- runExpr aExpr aEnv
-              return (env, eitherAVal)
+            Env.Expr _ ->
+              error "Unexpected error: Please check your logic"
 
         Env.Value val ->
           return (env, Right val)
 
-        Env.Thunk aExpr aEnv -> do
-          (_, eitherAVal) <- runExpr aExpr aEnv
-          return (env, eitherAVal)
+        Env.Expr aExpr -> do
+          runExpr aExpr env
 
     Num n ->
       return (env, Right $ VNum n)
