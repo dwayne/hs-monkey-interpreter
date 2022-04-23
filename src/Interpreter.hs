@@ -1,6 +1,7 @@
 module Interpreter
-  ( Value(..), Env, Error(..), ParseError
-  , run
+  ( run
+  , Env, Value(..)
+  , Error(..), ParseError
   )
   where
 
@@ -10,6 +11,8 @@ import qualified Hash
 import qualified Runtime
 
 import Control.Monad (join, liftM2)
+import Control.Monad.Except (throwError)
+import Control.Monad.State.Class (get, gets, modify, put)
 import Data.Bifunctor (first)
 import Data.List (genericIndex, genericLength)
 import Parser
@@ -26,217 +29,124 @@ run :: String -> Env -> IO (Env, Either Error Value)
 run input env =
   case parse input of
     Right program ->
-      fmap (fmap (first RuntimeError)) $ runProgram program env
+      fmap (fmap (first RuntimeError)) $ runEval (runProgram program) env
 
     Left parseError ->
       return (env, Left $ SyntaxError parseError)
 
 
-runProgram :: Program -> Env -> IO (Env, Either Runtime.Error Value)
-runProgram (Program stmts) env =
-  fmap (fmap (fmap returned)) $ runBlock stmts env
+runProgram :: Program -> Eval Value
+runProgram (Program stmts) = returned <$> runBlock stmts
 
 
-runBlock :: Block -> Env -> IO (Env, Either Runtime.Error Value)
-runBlock [] env = return (env, Right VNull)
-runBlock [stmt] env = runStmt stmt env
-runBlock (stmt : rest) env = do
-  (env', eitherVal) <- runStmt stmt env
-
-  case eitherVal of
-    Right val ->
-      if isReturned val then
-        return (env', Right val)
-      else
-        runBlock rest env'
-
-    Left err ->
-      return (env', Left err)
+runBlock :: Block -> Eval Value
+runBlock [] = return VNull
+runBlock [stmt] = runStmt stmt
+runBlock (stmt : rest) = do
+  val <- runStmt stmt
+  if isReturned val then
+    return val
+  else
+    runBlock rest
 
 
-runStmt :: Stmt -> Env -> IO (Env, Either Runtime.Error Value)
-runStmt stmt env =
+runStmt :: Stmt -> Eval Value
+runStmt stmt =
   case stmt of
     Let identifier expr ->
       case expr of
-        Function _ _ ->
-          return (Env.extendRec identifier expr env, Right VNull)
+        Function _ _ -> do
+          modify $ Env.extendRec identifier expr
+          return VNull
 
         _ -> do
-          (env', eitherVal) <- runExpr expr env
-          case eitherVal of
-            Right val ->
-              return (Env.extend identifier val env', Right VNull)
-
-            Left err ->
-              return (env, Left err)
+          val <- runExpr expr
+          modify $ Env.extend identifier val
+          return VNull
 
     Return expr ->
-      fmap (fmap (fmap VReturn)) $ runExpr expr env
+      VReturn <$> runExpr expr
 
     ExprStmt expr ->
-      runExpr expr env
+      runExpr expr
 
 
-runExpr :: Expr -> Env -> IO (Env, Either Runtime.Error Value)
-runExpr expr env =
+runExpr :: Expr -> Eval Value
+runExpr expr =
   case expr of
-    Var identifier ->
+    Var identifier -> do
+      env <- get
       case Env.lookup identifier env of
+        Env.Value val ->
+          return val
+
+        Env.Expr aExpr ->
+          runExpr aExpr
+
         Env.NotFound -> do
           builtinsEnv <- builtins
           case Env.lookup identifier builtinsEnv of
-            Env.NotFound ->
-              return (env, Left $ IdentifierNotFound identifier)
-
             Env.Value val ->
-              return (env, Right val)
+              return val
+
+            Env.NotFound ->
+              throwError $ IdentifierNotFound identifier
 
             Env.Expr _ ->
-              error "Unexpected error: Please check your logic"
-
-        Env.Value val ->
-          return (env, Right val)
-
-        Env.Expr aExpr -> do
-          runExpr aExpr env
+              fail "A builtin lookup should never return an expression"
 
     Num n ->
-      return (env, Right $ VNum n)
+      return $ VNum n
 
     Bool b ->
-      return (env, Right $ VBool b)
+      return $ VBool b
 
     String s ->
-      return (env, Right $ VString s)
+      return $ VString s
 
-    Array exprs -> do
-      eitherVals <- runExprs exprs env
+    Array exprs ->
+      VArray <$> runExprs exprs
 
-      case eitherVals of
-        Right vals ->
-          return (env, Right $ VArray vals)
+    Hash kvs ->
+      VHash <$> runKVExprs kvs
 
-        Left err ->
-          return (env, Left err)
+    Infix binOp a b ->
+      bindM2 (performBinOp binOp) (runExpr a) (runExpr b)
 
-    Hash kvExprs -> do
-      eitherKVS <- runKVExprs kvExprs env
+    Prefix unaryOp a ->
+      runExpr a >>= performUnaryOp unaryOp
 
-      case eitherKVS of
-        Right kvs ->
-          return (env, Right $ VHash $ Hash.fromList kvs)
+    Call f args ->
+      bindM2 callFunction (runExpr f) (runExprs args)
 
-        Left err ->
-          return (env, Left err)
-
-    Infix binOp a b -> do
-      (env', eitherAVal) <- runExpr a env
-      (env'', eitherBVal) <- runExpr b env'
-
-      let result = join $ liftM2 (performBinOp binOp) eitherAVal eitherBVal
-
-      return (env'', result)
-
-    Prefix unaryOp a -> do
-      (env', eitherVal) <- runExpr a env
-      return (env', eitherVal >>= performUnaryOp unaryOp)
-
-    Call fExpr argExprs -> do
-      (_, eitherFVal) <- runExpr fExpr env
-      eitherArgVals <- runExprs argExprs env
-
-      case eitherFVal of
-        Right fVal ->
-          case eitherArgVals of
-            Right argVals -> do
-              eitherVal <- callFunction fVal argVals
-              return (env, eitherVal)
-
-            Left err ->
-              return (env, Left err)
-
-        Left err ->
-          return (env, Left err)
-
-    Index aExpr iExpr -> do
-      (_, eitherAVal) <- runExpr aExpr env
-
-      case eitherAVal of
-        Right aVal -> do
-          (_, eitherIVal) <- runExpr iExpr env
-
-          case eitherIVal of
-            Right iVal -> do
-              return (env, getValueAt aVal iVal)
-
-            Left err ->
-              return (env, Left err)
-
-        Left err ->
-          return (env, Left err)
+    Index a i -> do
+      bindM2 getValueAt (runExpr a) (runExpr i)
 
     If condition thenBlock maybeElseBlock -> do
-      (env', eitherConditionVal) <- runExpr condition env
-      case eitherConditionVal of
-        Right conditionVal ->
-          if isTruthy conditionVal then
-            runBlock thenBlock env'
-          else
-            case maybeElseBlock of
-              Nothing ->
-                return (env', Right VNull)
-
-              Just elseBlock ->
-                runBlock elseBlock env'
-
-        Left err ->
-          return (env', Left err)
+      conditionVal <- runExpr condition
+      if isTruthy conditionVal then
+        runBlock thenBlock
+      else
+        maybe (return VNull) runBlock maybeElseBlock
 
     Function params body ->
-      return (env, Right $ VFunction params body env)
+      gets $ VFunction params body
 
 
-runExprs :: [Expr] -> Env -> IO (Either Runtime.Error [Value])
-runExprs exprs env = helper exprs []
+runExprs :: [Expr] -> Eval [Value]
+runExprs = mapM runExpr
+
+
+runKVExprs :: [(Expr, Expr)] -> Eval Hash
+runKVExprs kvExprs = Hash.fromList <$> mapM toKeyVal kvExprs
   where
-    helper [] vals = return $ Right $ reverse vals
-    helper (expr:rest) vals = do
-      (_, eitherVal) <- runExpr expr env
-      case eitherVal of
-        Right val ->
-          helper rest (val : vals)
-
-        Left err ->
-          return $ Left err
+    toKeyVal (kExpr, vExpr) = do
+      key <- runExpr kExpr >>= toKey
+      val <- runExpr vExpr
+      return (key, val)
 
 
-runKVExprs :: [(Expr, Expr)] -> Env -> IO (Either Runtime.Error [(Hash.Key, Value)])
-runKVExprs kvExprs env = helper kvExprs []
-  where
-    helper [] kvs = return $ Right kvs
-    helper ((kExpr, vExpr):rest) kvs = do
-      (_, eitherKey) <- runExpr kExpr env
-      case eitherKey of
-        Right kVal ->
-          case toKey kVal of
-            Right key -> do
-              (_, eitherVal) <- runExpr vExpr env
-              case eitherVal of
-                Right val ->
-                  helper rest ((key, val) : kvs)
-
-                Left err ->
-                  return $ Left err
-
-            Left err ->
-              return $ Left err
-
-        Left err ->
-          return $ Left err
-
-
-performBinOp :: BinOp -> Value -> Value -> Either Runtime.Error Value
+performBinOp :: BinOp -> Value -> Value -> Eval Value
 performBinOp Equal       = performEqual
 performBinOp NotEqual    = performNotEqual
 performBinOp LessThan    = performLessThan
@@ -247,135 +157,139 @@ performBinOp Mul         = performMul
 performBinOp Div         = performDiv
 
 
-performEqual :: Value -> Value -> Either Runtime.Error Value
-performEqual (VNum a) (VNum b) = Right $ VBool $ a == b
-performEqual (VBool a) (VBool b) = Right $ VBool $ a == b
-performEqual _ _ = Right $ VBool False
+performEqual :: Value -> Value -> Eval Value
+performEqual (VNum a) (VNum b) = return $ VBool $ a == b
+performEqual (VBool a) (VBool b) = return $ VBool $ a == b
+performEqual _ _ = return $ VBool False
 
 
-performNotEqual :: Value -> Value -> Either Runtime.Error Value
-performNotEqual (VNum a) (VNum b) = Right $ VBool $ a /= b
-performNotEqual (VBool a) (VBool b) = Right $ VBool $ a /= b
-performNotEqual _ _ = Right $ VBool True
+performNotEqual :: Value -> Value -> Eval Value
+performNotEqual (VNum a) (VNum b) = return $ VBool $ a /= b
+performNotEqual (VBool a) (VBool b) = return $ VBool $ a /= b
+performNotEqual _ _ = return $ VBool True
 
 
-performLessThan :: Value -> Value -> Either Runtime.Error Value
-performLessThan (VNum a) (VNum b) = Right $ VBool $ a < b
+performLessThan :: Value -> Value -> Eval Value
+performLessThan (VNum a) (VNum b) = return $ VBool $ a < b
 performLessThan aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " < " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " < " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " < " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " < " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performGreaterThan :: Value -> Value -> Either Runtime.Error Value
-performGreaterThan (VNum a) (VNum b) = Right $ VBool $ a > b
+performGreaterThan :: Value -> Value -> Eval Value
+performGreaterThan (VNum a) (VNum b) = return $ VBool $ a > b
 performGreaterThan aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " > " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " > " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " > " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " > " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performAdd :: Value -> Value -> Either Runtime.Error Value
-performAdd (VNum a) (VNum b) = Right $ VNum $ a + b
-performAdd (VString a) (VString b) = Right $ VString $ a ++ b
+performAdd :: Value -> Value -> Eval Value
+performAdd (VNum a) (VNum b) = return $ VNum $ a + b
+performAdd (VString a) (VString b) = return $ VString $ a ++ b
 performAdd aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " + " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " + " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " + " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " + " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performSub :: Value -> Value -> Either Runtime.Error Value
-performSub (VNum a) (VNum b) = Right $ VNum $ a - b
+performSub :: Value -> Value -> Eval Value
+performSub (VNum a) (VNum b) = return $ VNum $ a - b
 performSub aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " - " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " - " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " - " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " - " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performMul :: Value -> Value -> Either Runtime.Error Value
-performMul (VNum a) (VNum b) = Right $ VNum $ a * b
+performMul :: Value -> Value -> Eval Value
+performMul (VNum a) (VNum b) = return $ VNum $ a * b
 performMul aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " * " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " * " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " * " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " * " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performDiv :: Value -> Value -> Either Runtime.Error Value
-performDiv (VNum a) (VNum b) = Right $ VNum $ a `div` b
+performDiv :: Value -> Value -> Eval Value
+performDiv (VNum a) (VNum b) = return $ VNum $ a `div` b
 performDiv aVal bVal
-  | ta /= tb = Left $ TypeMismatch $ ta ++ " / " ++ tb
-  | otherwise = Left $ UnknownOperator $ ta ++ " / " ++ tb
+  | ta /= tb = throwError $ TypeMismatch $ ta ++ " / " ++ tb
+  | otherwise = throwError $ UnknownOperator $ ta ++ " / " ++ tb
   where
     ta = typeOf aVal
     tb = typeOf bVal
 
 
-performUnaryOp :: UnaryOp -> Value -> Either Runtime.Error Value
+performUnaryOp :: UnaryOp -> Value -> Eval Value
 performUnaryOp Not    = performNot
 performUnaryOp Negate = performNegate
 
 
-performNot :: Value -> Either Runtime.Error Value
-performNot (VBool b) = Right $ VBool $ not b
-performNot VNull = Right $ VBool True
-performNot _ = Right $ VBool False
+performNot :: Value -> Eval Value
+performNot (VBool b) = return $ VBool $ not b
+performNot VNull = return $ VBool True
+performNot _ = return $ VBool False
 
 
-performNegate :: Value -> Either Runtime.Error Value
-performNegate (VNum n) = Right $ VNum $ negate n
-performNegate v = Left $ UnknownOperator $ "-" ++ typeOf v
+performNegate :: Value -> Eval Value
+performNegate (VNum n) = return $ VNum $ negate n
+performNegate v = throwError $ UnknownOperator $ "-" ++ typeOf v
 
 
-callFunction :: Value -> [Value] -> IO (Either Runtime.Error Value)
+callFunction :: Value -> [Value] -> Eval Value
 callFunction (VFunction params body env) args
   | numArgs == numParams = do
     let extendedEnv = Env.extendMany (zip params args) env
-    (_, eitherVal) <- runBlock body extendedEnv
-    case eitherVal of
-      Right val ->
-        return $ Right $ returned val
+    put extendedEnv
+    val <- runBlock body
+    return $ returned val
 
-      err ->
-        return err
-  | otherwise = return $ Left $ ArgumentError $ "wrong number of arguments. got=" ++ show numArgs ++ ", want=" ++ show numParams
+  | otherwise = throwError $ ArgumentError $ "wrong number of arguments. got=" ++ show numArgs ++ ", want=" ++ show numParams
   where
     numParams = length params
     numArgs = length args
 
 callFunction (VBuiltinFunction builtin) args = builtin args
 
-callFunction val _ = return $ Left $ NotAFunction $ typeOf val
+callFunction val _ = throwError $ NotAFunction $ typeOf val
 
 
-getValueAt :: Value -> Value -> Either Runtime.Error Value
+getValueAt :: Value -> Value -> Eval Value
 getValueAt (VArray arr) (VNum n)
-  | n >= 0 && n < genericLength arr = Right $ genericIndex arr n
-  | otherwise = Right VNull
+  | n >= 0 && n < genericLength arr = return $ genericIndex arr n
+  | otherwise = return VNull
 
 getValueAt (VHash hash) (VNum n) =
-  maybe (Right VNull) Right $ Hash.find (Hash.KNum n) hash
+  maybe (return VNull) return $ Hash.find (Hash.KNum n) hash
 
 getValueAt (VHash hash) (VBool b) =
-  maybe (Right VNull) Right $ Hash.find (Hash.KBool b) hash
+  maybe (return VNull) return $ Hash.find (Hash.KBool b) hash
 
 getValueAt (VHash hash) (VString s) =
-  maybe (Right VNull) Right $ Hash.find (Hash.KString s) hash
+  maybe (return VNull) return $ Hash.find (Hash.KString s) hash
 
-getValueAt a i = Left $ TypeMismatch $ typeOf a ++ "[" ++ typeOf i ++ "]"
+getValueAt a i = throwError $ TypeMismatch $ typeOf a ++ "[" ++ typeOf i ++ "]"
 
 
-toKey :: Value -> Either Runtime.Error Hash.Key
-toKey (VNum n) = Right $ Hash.KNum n
-toKey (VBool b) = Right $ Hash.KBool b
-toKey (VString s) = Right $ Hash.KString s
-toKey v = Left $ TypeMismatch $ "unusable as hash key: " ++ typeOf v
+toKey :: Value -> Eval Hash.Key
+toKey (VNum n) = return $ Hash.KNum n
+toKey (VBool b) = return $ Hash.KBool b
+toKey (VString s) = return $ Hash.KString s
+toKey v = throwError $ TypeMismatch $ "unusable as hash key: " ++ typeOf v
+
+
+-- HELPERS
+
+
+bindM2 :: Monad m => (a -> b -> m c) -> m a -> m b -> m c
+bindM2 f ma mb = join $ liftM2 f ma mb

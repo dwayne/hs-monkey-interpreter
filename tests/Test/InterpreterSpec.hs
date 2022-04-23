@@ -5,7 +5,7 @@ import qualified Environment as Env
 import qualified Hash
 import qualified Runtime
 
-import Interpreter (run, Value(..), Error(..))
+import Interpreter (run, Error(..))
 import Runtime hiding (Error)
 import Test.Hspec
 
@@ -605,6 +605,7 @@ makeBadExamples = makeExamples . fmap (fmap (Left . RuntimeError))
 makeExamples :: [(String, Either Error Value)] -> SpecWith (Arg Expectation)
 makeExamples examples =
   let
+    numberedExamples :: [(Int, (String, Either Error Value))]
     numberedExamples = zip [1..] examples
 
     makeExample (n, (input, expectedOutput)) =

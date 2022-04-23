@@ -1,6 +1,17 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 module Runtime
-  ( Value(..), Env, Hash, BuiltinFunction, Error(..)
+  ( Eval
+  , runEval
+
+  , Value(..)
+  , Env, Hash, BuiltinFunction
+  , Error(..)
+
   , isTruthy, isReturned, returned, typeOf
+
   , builtins
   ) where
 
@@ -8,8 +19,83 @@ module Runtime
 import qualified Environment as Env
 import qualified Hash
 
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Except (MonadError, throwError, catchError)
+import Control.Monad.State.Class (MonadState, get, put)
 import Environment (Environment)
 import Parser
+
+
+-- EVAL
+
+
+newtype Eval a
+  = Eval { runEval :: Env -> IO (Env, Either Error a) }
+
+type Env = Environment Id Value Expr
+
+data Error
+  = TypeMismatch String
+  | UnknownOperator String
+  | IdentifierNotFound String
+  | NotAFunction String
+  | ArgumentError String
+  | BuiltinError String
+  | UnexpectedError String
+  deriving (Eq, Show)
+
+
+instance Functor Eval where
+  fmap f (Eval t) = Eval $ \env -> fmap (fmap (fmap f)) (t env)
+
+
+instance Applicative Eval where
+  pure a = Eval $ \env -> pure (env, pure a)
+
+  (Eval tab) <*> (Eval ta) =
+    Eval $ \env -> do
+      (env', eitherF) <- tab env
+      case eitherF of
+        Right f -> fmap (fmap (fmap f)) (ta env')
+        Left e  -> return (env', Left e)
+
+
+instance Monad Eval where
+  (Eval t) >>= f =
+    Eval $ \env -> do
+      (env', eitherA) <- t env
+      case eitherA of
+        Right a -> runEval (f a) env'
+        Left e  -> return (env', Left e)
+
+
+instance MonadFail Eval where
+  fail s = Eval $ \env -> return (env, Left $ UnexpectedError s)
+
+
+instance MonadState Env Eval where
+  get = Eval $ \env -> return (env, return env)
+  put env = Eval $ \_ -> return (env, return ())
+
+
+instance MonadError Error Eval where
+  throwError err = Eval $ \env -> return (env, Left err)
+  (Eval t) `catchError` handler =
+    Eval $ \env -> do
+      (env', eitherA) <- t env
+      case eitherA of
+        Right a -> return (env', Right a)
+        Left e  -> runEval (handler e) env'
+
+
+instance MonadIO Eval where
+  liftIO action =
+    Eval $ \env -> do
+      a <- action
+      return (env, return a)
+
+
+-- VALUE
 
 
 data Value
@@ -23,19 +109,8 @@ data Value
   | VFunction [Id] Block Env
   | VBuiltinFunction BuiltinFunction
 
-type Env = Environment Id Value Expr
 type Hash = Hash.Hash Value
-
-type BuiltinFunction = [Value] -> IO (Either Error Value)
-
-data Error
-  = TypeMismatch String
-  | UnknownOperator String
-  | IdentifierNotFound String
-  | NotAFunction String
-  | ArgumentError String
-  | BuiltinError String
-  deriving (Eq, Show)
+type BuiltinFunction = [Value] -> Eval Value
 
 
 instance Eq Value where
@@ -116,7 +191,7 @@ typeOf (VBuiltinFunction _) = "BUILTIN"
 -- BUILTIN FUNCTIONS
 
 
-builtins :: IO Env
+builtins :: Eval Env
 builtins =
   return $ Env.fromList $ map (fmap VBuiltinFunction)
     [ ("len", builtinLen)
@@ -130,91 +205,92 @@ builtins =
 
 builtinLen :: BuiltinFunction
 builtinLen args =
-  return $
-    case args of
-      [VString s] ->
-        Right $ VNum $ fromIntegral $ length s
+  case args of
+    [VString s] ->
+      return $ VNum $ fromIntegral $ length s
 
-      [VArray a] ->
-        Right $ VNum $ fromIntegral $ length a
+    [VArray a] ->
+      return $ VNum $ fromIntegral $ length a
 
-      [arg] ->
-        Left $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
+    [arg] ->
+      throwError $ BuiltinError $ "argument to `len` not supported, got " ++ typeOf arg
 
-      _ ->
-        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+    _ ->
+      throwError $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinFirst :: BuiltinFunction
 builtinFirst args =
-  return $
-    case args of
-      [VArray []] ->
-        Right VNull
+  case args of
+    [VArray []] ->
+      return VNull
 
-      [VArray (x:_)] ->
-        Right x
+    [VArray (x:_)] ->
+      return x
 
-      [arg] ->
-        Left $ BuiltinError $ "argument to `first` must be ARRAY, got " ++ typeOf arg
+    [arg] ->
+      throwError $ BuiltinError $ "argument to `first` must be ARRAY, got " ++ typeOf arg
 
-      _ ->
-        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+    _ ->
+      throwError $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinLast :: BuiltinFunction
 builtinLast args =
-  return $
-    case args of
-      [VArray []] ->
-        Right VNull
+  case args of
+    [VArray []] ->
+      return VNull
 
-      [VArray arr] ->
-        Right $ last arr
+    [VArray arr] ->
+      return $ last arr
 
-      [arg] ->
-        Left $ BuiltinError $ "argument to `last` must be ARRAY, got " ++ typeOf arg
+    [arg] ->
+      throwError $ BuiltinError $ "argument to `last` must be ARRAY, got " ++ typeOf arg
 
-      _ ->
-        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+    _ ->
+      throwError $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinRest :: BuiltinFunction
 builtinRest args =
-  return $
-    case args of
-      [VArray []] ->
-        Right VNull
+  case args of
+    [VArray []] ->
+      return VNull
 
-      [VArray (_:rest)] ->
-        Right $ VArray rest
+    [VArray (_:rest)] ->
+      return $ VArray rest
 
-      [arg] ->
-        Left $ BuiltinError $ "argument to `rest` must be ARRAY, got " ++ typeOf arg
+    [arg] ->
+      throwError $ BuiltinError $ "argument to `rest` must be ARRAY, got " ++ typeOf arg
 
-      _ ->
-        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
+    _ ->
+      throwError $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=1"
 
 
 builtinPush :: BuiltinFunction
 builtinPush args =
-  return $
-    case args of
-      [VArray arr, val] ->
-        Right $ VArray $ arr ++ [val]
+  case args of
+    [VArray arr, val] ->
+      return $ VArray $ arr ++ [val]
 
-      [subject, _] ->
-        Left $ BuiltinError $ "argument to `push` must be ARRAY, got " ++ typeOf subject
+    [subject, _] ->
+      throwError $ BuiltinError $ "argument to `push` must be ARRAY, got " ++ typeOf subject
 
-      _ ->
-        Left $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=2"
+    _ ->
+      throwError $ BuiltinError $ "wrong number of arguments. got=" ++ show (length args) ++ ", want=2"
 
 
 builtinPuts :: BuiltinFunction
 builtinPuts args =
   case args of
     [] ->
-      return $ Right VNull
+      return VNull
 
     (arg:rest) ->
-      print arg >> builtinPuts rest
+      liftIO (print arg) >> builtinPuts rest
+
+  -- Alternatively, we can derive the following:
+  --
+  -- > liftIO (mapM_ print args) >> return VNull
+  --
+  -- Is that more readable?
