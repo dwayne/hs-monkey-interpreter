@@ -11,11 +11,12 @@ import Text.Parsec.String (Parser)
 
 
 spec :: Spec
-spec = do
-  identifierSpec
-  numberSpec
-  booleanSpec
-  stringSpec
+spec =
+  describe "lexer" $ do
+    identifierSpec
+    numberSpec
+    booleanSpec
+    stringSpec
 
 
 identifierSpec :: Spec
