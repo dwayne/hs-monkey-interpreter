@@ -1,7 +1,7 @@
 cabal-version: 2.4
 
 name: monkey-interpreter
-version: 0.1
+version: 0.2
 
 
 library
